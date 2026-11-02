@@ -78,7 +78,10 @@ svg#board{display:block;width:100%;height:auto;touch-action:none;user-select:non
 .seg button{border:0;background:transparent;padding:7px 16px;font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button.on{background:var(--accent);color:var(--accent-fg)}
-.possbar .ghost{margin-left:auto}
+.possbar>#resetAll{margin-left:auto}
+.ends{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.ends label{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.ghost.on{border-color:var(--accent);color:var(--accent);font-weight:700}
 .tctrls{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media (max-width:700px){.tctrls{grid-template-columns:1fr}}
 .tctrl{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
@@ -210,6 +213,10 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       <button data-poss="home" id="possH">ホーム</button>
       <button data-poss="away" id="possA">アウェイ</button>
     </div>
+    <span class="ends">
+      <label><input type="checkbox" id="autoEnds"> 後半でエンドを交代</label>
+      <button class="ghost" id="swapEnds">エンドを入れ替え</button>
+    </span>
     <button class="ghost" id="resetAll">両チームとも保存した配置に戻す</button>
   </div>
 
@@ -348,6 +355,9 @@ const modeOf=t=>S.poss==="none"?"nrm":S.poss===t?"atk":"def";
 const shapeOf=(t,m=modeOf(t))=>S.shapes[t][m];
 const fmOf=(t,m)=>shapeOf(t,m).fm||S.data.teams[t].formation;
 function save(){try{sessionStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+/* ends: teams change ends for the 2nd half and 2nd half of extra time (like a broadcast); positions are stored as at kickoff */
+function endsFlipped(){const seg=norm(S.applied).seg;const second=seg==="2H"||seg==="ET2"||seg==="PK";return (S.autoEnds!==false&&second)!==!!S.endSwap}
+const endView=p=>endsFlipped()?{x:105-p.x,y:68-p.y}:p;
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -447,7 +457,7 @@ function render(){
     const col=T[t].color,fg=textOn(col);
     st.slots[t].forEach((pid,s)=>{
       if(!pid)return;const p=pm[pid];if(!p)return;
-      const o=slotPos(t,s);
+      const o=endView(slotPos(t,s));
       const gk=s===0;
       g+=`<g class="pl" data-team="${t}" data-slot="${s}" transform="translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})" style="cursor:grab">
         <circle r="3.4" fill="transparent"/>
@@ -499,6 +509,7 @@ function renderFmSelects(){
   const T=S.data.teams;
   $("possH").innerHTML=`<span class="chip" style="background:${T.home.color}"></span>${esc(T.home.name)} 保持`;
   $("possA").innerHTML=`<span class="chip" style="background:${T.away.color}"></span>${esc(T.away.name)} 保持`;
+  $("autoEnds").checked=S.autoEnds!==false;$("swapEnds").classList.toggle("on",!!S.endSwap);$("swapEnds").setAttribute("aria-pressed",!!S.endSwap);
   [["possN","none"],["possH","home"],["possA","away"]].forEach(([id,v])=>{$(id).classList.toggle("on",S.poss===v);$(id).setAttribute("aria-pressed",S.poss===v)});
   document.querySelectorAll(".tctrl").forEach(el=>{
     const t=el.dataset.team,cur=modeOf(t);
@@ -538,6 +549,8 @@ document.querySelector(".tctrls").addEventListener("click",e=>{
   if(b.dataset.act==="reset"){sh.work={};tmsg[t]=sh.pos||sh.fm?`保存した${MODE_NAME[m]}の配置に戻しました`:`${MODE_NAME[m]}は保存がないので、最初の配置に戻しました`}
   if(b.dataset.act==="init"){sh.fm=null;sh.pos=null;sh.work={};tmsg[t]=`${MODE_NAME[m]}を最初の状態(${S.data.teams[t].formation})に戻しました`}
   save();render()});
+$("autoEnds").onchange=e=>{S.autoEnds=e.target.checked;save();render()};
+$("swapEnds").onclick=()=>{S.endSwap=!S.endSwap;save();render()};
 $("resetAll").onclick=()=>{["home","away"].forEach(t=>{MODES.forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});save();render()};
 
 /* ---------- drag ---------- */
@@ -552,7 +565,7 @@ svg.addEventListener("pointerdown",ev=>{
 svg.addEventListener("pointermove",ev=>{if(!drag)return;const p=svgPt(ev);
   drag.x=Math.max(-2,Math.min(107,p.x+drag.dx));drag.y=Math.max(-2,Math.min(70,p.y+drag.dy));
   drag.g.setAttribute("transform",`translate(${drag.x.toFixed(2)} ${drag.y.toFixed(2)})`)});
-function endDrag(){if(!drag)return;const g=drag.g;shapeOf(g.dataset.team).work[g.dataset.slot]={x:drag.x,y:drag.y};
+function endDrag(){if(!drag)return;const g=drag.g;shapeOf(g.dataset.team).work[g.dataset.slot]=endView({x:drag.x,y:drag.y});
   g.classList.remove("dragging");g.style.cursor="grab";drag=null;save()}
 svg.addEventListener("pointerup",endDrag);svg.addEventListener("pointercancel",endDrag);
 
