@@ -74,7 +74,7 @@ svg#board{display:block;width:100%;height:auto;touch-action:none;user-select:non
 .ghost{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 14px;font-size:14px}
 .possbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
 .plabel{font-size:13px;color:var(--muted)}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg{display:inline-flex;flex-wrap:wrap;max-width:100%;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
 .seg button{border:0;background:transparent;padding:7px 16px;font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px}
 .seg button+button{border-left:1px solid var(--line)}
 .seg button.on{background:var(--accent);color:var(--accent-fg)}
@@ -85,6 +85,7 @@ svg#board{display:block;width:100%;height:auto;touch-action:none;user-select:non
 .tctrl .th{display:flex;align-items:center;gap:8px;font-weight:700;flex-wrap:wrap}
 .tctrl .mode{font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid currentColor;color:var(--accent)}
 .tctrl .mode.def{color:var(--pending)}
+.tctrl .mode.nrm{color:var(--muted)}
 .fmrow{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:13px}
 .fmrow .lbl{color:var(--muted)}
 .fmrow .lbl.cur{color:var(--fg);font-weight:700}
@@ -203,8 +204,9 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
   <div class="boardbox"><svg id="board" viewBox="-4 -4 113 76" aria-label="戦術ボード"></svg></div>
 
   <div class="possbar">
-    <span class="plabel">ボール保持</span>
-    <div class="seg" id="possSeg" role="group" aria-label="ボール保持">
+    <span class="plabel">配置パターン</span>
+    <div class="seg" id="possSeg" role="group" aria-label="配置パターン">
+      <button data-poss="none" id="possN">ノーマル</button>
       <button data-poss="home" id="possH">ホーム</button>
       <button data-poss="away" id="possA">アウェイ</button>
     </div>
@@ -332,20 +334,20 @@ const SAMPLE={
 const clone=o=>JSON.parse(JSON.stringify(o));
 const KEY="tacboard.v1";
 let S=null;
-try{S=JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){S=null}
-if(!S||!S.data||!S.data.teams){S=fresh(clone(SAMPLE))}
-if(typeof S.pending!=="object"||!S.pending)S.pending=kick();
-if(typeof S.applied!=="object"||!S.applied)S.applied=kick();
-if(!S.shapes){S.shapes=newShapes();S.poss="home";delete S.overrides;delete S.live}
+/* board state lives only for this session: it survives an accidental reload, and is gone once the app or tab is closed */
+try{localStorage.removeItem(KEY)}catch(e){}
+try{S=JSON.parse(sessionStorage.getItem(KEY)||"null")}catch(e){S=null}
+if(!S||!S.data||!S.data.teams||!S.shapes||!S.shapes.home.nrm){S=fresh(clone(SAMPLE))}
 function kick(){return {seg:"1H",min:0,add:0}}
+const MODES=["nrm","atk","def"];
 function newShape(){return {fm:null,pos:null,work:{}}}
-function newShapes(){return {home:{atk:newShape(),def:newShape()},away:{atk:newShape(),def:newShape()}}}
-function fresh(data){return {data,shapes:newShapes(),poss:"home",pending:kick(),applied:kick()}}
-const MODE_NAME={atk:"保持時",def:"非保持時"};
-const modeOf=t=>S.poss===t?"atk":"def";
+function newShapes(){const t=()=>({nrm:newShape(),atk:newShape(),def:newShape()});return {home:t(),away:t()}}
+function fresh(data){return {data,shapes:newShapes(),poss:"none",pending:kick(),applied:kick()}}
+const MODE_NAME={nrm:"ノーマル",atk:"保持時",def:"非保持時"};
+const modeOf=t=>S.poss==="none"?"nrm":S.poss===t?"atk":"def";
 const shapeOf=(t,m=modeOf(t))=>S.shapes[t][m];
 const fmOf=(t,m)=>shapeOf(t,m).fm||S.data.teams[t].formation;
-function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function save(){try{sessionStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -405,8 +407,8 @@ function compute(t){const idx=ord(t);
 function parseFm(f){let l=String(f||"").split("-").map(n=>parseInt(n,10)).filter(n=>n>0);if(l.reduce((a,b)=>a+b,0)!==10)l=[4,4,2];return l}
 /* default shape: in possession the lines push up and spread, out of possession they sit compact */
 function defaultLayout(team,m){
-  const lines=parseFm(fmOf(team,m));const atk=m==="atk";
-  const x0=atk?22:12,x1=atk?60:37,gk=atk?7:4.5,w=atk?62:56;
+  const lines=parseFm(fmOf(team,m));
+  const [x0,x1,gk,w]={nrm:[16,46,4.5,62],atk:[22,60,7,62],def:[12,37,4.5,56]}[m];
   const pos=[{x:gk,y:34}];const n=lines.length;
   lines.forEach((k,li)=>{const x=n===1?(x0+x1)/2:x0+(x1-x0)*li/(n-1);
     for(let i=0;i<k;i++)pos.push({x,y:34+w/2-w*(i+1)/(k+1)})});
@@ -495,10 +497,9 @@ function renderTime(){
 const tmsg={home:"",away:""};
 function renderFmSelects(){
   const T=S.data.teams;
-  $("possH").innerHTML=`<span class="chip" style="background:${T.home.color}"></span>${esc(T.home.name)}`;
-  $("possA").innerHTML=`<span class="chip" style="background:${T.away.color}"></span>${esc(T.away.name)}`;
-  $("possH").classList.toggle("on",S.poss==="home");$("possA").classList.toggle("on",S.poss==="away");
-  $("possH").setAttribute("aria-pressed",S.poss==="home");$("possA").setAttribute("aria-pressed",S.poss==="away");
+  $("possH").innerHTML=`<span class="chip" style="background:${T.home.color}"></span>${esc(T.home.name)} 保持`;
+  $("possA").innerHTML=`<span class="chip" style="background:${T.away.color}"></span>${esc(T.away.name)} 保持`;
+  [["possN","none"],["possH","home"],["possA","away"]].forEach(([id,v])=>{$(id).classList.toggle("on",S.poss===v);$(id).setAttribute("aria-pressed",S.poss===v)});
   document.querySelectorAll(".tctrl").forEach(el=>{
     const t=el.dataset.team,cur=modeOf(t);
     const row=m=>{const f=fmOf(t,m),list=FORMATIONS.includes(f)?FORMATIONS:[f,...FORMATIONS],sh=shapeOf(t,m);
@@ -507,7 +508,7 @@ function renderFmSelects(){
         <span><select data-m="${m}" aria-label="${esc(T[t].name)} ${MODE_NAME[m]}のシステム">${list.map(x=>`<option ${x===f?"selected":""}>${esc(x)}</option>`).join("")}</select><span class="saved">${note}</span></span>`};
     el.innerHTML=`<div class="th"><span class="chip" style="background:${T[t].color}"></span>${esc(T[t].name)}
         <span class="mode ${cur}">${MODE_NAME[cur]}を表示中</span></div>
-      <div class="fmrow">${row("atk")}${row("def")}</div>
+      <div class="fmrow">${MODES.map(row).join("")}</div>
       <div class="tbtns">
         <button class="ghost" data-act="save">今の配置を保存</button>
         <button class="ghost" data-act="reset">保存した配置に戻す</button>
@@ -537,7 +538,7 @@ document.querySelector(".tctrls").addEventListener("click",e=>{
   if(b.dataset.act==="reset"){sh.work={};tmsg[t]=sh.pos||sh.fm?`保存した${MODE_NAME[m]}の配置に戻しました`:`${MODE_NAME[m]}は保存がないので、最初の配置に戻しました`}
   if(b.dataset.act==="init"){sh.fm=null;sh.pos=null;sh.work={};tmsg[t]=`${MODE_NAME[m]}を最初の状態(${S.data.teams[t].formation})に戻しました`}
   save();render()});
-$("resetAll").onclick=()=>{["home","away"].forEach(t=>{["atk","def"].forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});save();render()};
+$("resetAll").onclick=()=>{["home","away"].forEach(t=>{MODES.forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});save();render()};
 
 /* ---------- drag ---------- */
 const svg=$("board");let drag=null;
@@ -632,7 +633,7 @@ $("sampleBtn").onclick=()=>{S=fresh(clone(SAMPLE));save();renderEditor();render(
 function flipTeam(t){
   const T=S.data.teams[t],st=T.players.filter(p=>p.starter),bn=T.players.filter(p=>!p.starter);
   const out=[st[0]];let i=1;parseFm(T.formation).forEach(k=>{out.push(...st.slice(i,i+k).reverse());i+=k});out.push(...st.slice(i));
-  T.players=[...out.filter(Boolean),...bn];["atk","def"].forEach(m=>{S.shapes[t][m].pos=null;S.shapes[t][m].work={}});
+  T.players=[...out.filter(Boolean),...bn];MODES.forEach(m=>{S.shapes[t][m].pos=null;S.shapes[t][m].work={}});
 }
 function loadMatch(data){S=fresh(data);save();renderEditor();render()}
 
