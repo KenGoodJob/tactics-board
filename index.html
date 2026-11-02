@@ -93,6 +93,21 @@ svg#board{display:block;width:100%;height:auto;touch-action:none;user-select:non
 .tbtns{display:flex;gap:6px;flex-wrap:wrap}
 .tbtns .ghost{padding:5px 10px;font-size:13px}
 .tmsg{font-size:12px;color:var(--accent);min-height:1.2em}
+details.editor>summary span.safe{color:var(--muted)}
+.frow{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+.frow .field input{min-width:0}
+.lgs{display:flex;gap:6px;flex-wrap:wrap}
+.lgs label{display:flex;align-items:center;gap:4px;font-size:13px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--bg)}
+.fmsg{font-size:13px;color:var(--muted);min-height:1.2em}
+.fmsg.err{color:var(--danger)}
+.fxlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.fxlist li{display:grid;grid-template-columns:3.4em 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.fxlist .ko{font-family:var(--f-display);font-weight:600;font-size:17px;font-variant-numeric:tabular-nums}
+.fxlist .lg{font-size:11px;color:var(--muted);display:block}
+.fxlist .vs{min-width:0;overflow-wrap:anywhere}
+.fxlist .ghost{padding:5px 12px;font-size:13px}
+h3.sub{margin:4px 0 0;font-size:13px;color:var(--muted);font-weight:500}
+.keybox>summary{cursor:pointer;font-size:14px;color:var(--muted)}
 
 /* lower panels */
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -207,6 +222,37 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <section class="panel"><h2 id="benchHTitle">Home</h2><ul class="plist" id="benchH"></ul></section>
     <section class="panel"><h2 id="benchATitle">Away</h2><ul class="plist" id="benchA"></ul></section>
   </div>
+
+  <details class="editor finder" id="finder">
+    <summary>試合を探して読み込む<span class="safe">スコアや結果は表示しません</span></summary>
+    <div class="ed">
+      <div class="frow">
+        <label class="field">日付(日本時間)<input type="date" id="fDate"></label>
+        <button class="ghost" id="fPrev" aria-label="前の日">前日</button>
+        <button class="ghost" id="fNext" aria-label="次の日">翌日</button>
+        <button class="update" id="fSearch" style="margin-left:0">検索</button>
+      </div>
+      <div class="lgs" id="fLeagues"></div>
+      <div class="fmsg" id="fMsg"></div>
+      <ul class="fxlist" id="fList"></ul>
+      <div id="fRecentBox">
+        <h3 class="sub">読み込んだ試合(通信なしで開けます)</h3>
+        <ul class="fxlist" id="fRecent"></ul>
+      </div>
+      <details class="keybox" id="keyBox">
+        <summary>APIキーの設定</summary>
+        <div class="ed" style="padding:10px 0 0">
+          <p class="hint">API-Footballのダッシュボードで発行したキーを入力します。キーはこの端末のブラウザにだけ保存され、GitHubには送られません。</p>
+          <div class="frow">
+            <input type="password" id="fKey" autocomplete="off" placeholder="APIキー" style="flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:6px 8px">
+            <button class="ghost" id="fKeySave">保存</button>
+            <button class="ghost" id="fKeyDel">削除</button>
+          </div>
+          <div class="fmsg" id="fKeyMsg"></div>
+        </div>
+      </details>
+    </div>
+  </details>
 
   <details class="editor" id="editor">
     <summary>試合データを編集<span>開くと交代や得点が見えます</span></summary>
@@ -466,6 +512,7 @@ function renderFmSelects(){
         <button class="ghost" data-act="save">今の配置を保存</button>
         <button class="ghost" data-act="reset">保存した配置に戻す</button>
         <button class="ghost" data-act="init">最初の状態に戻す</button>
+        <button class="ghost" data-act="flip" title="スタメンの左右が逆になっているときに使います">左右を反転</button>
       </div>
       <div class="tmsg">${esc(tmsg[t])}</div>`;
   });
@@ -485,6 +532,7 @@ document.querySelector(".tctrls").addEventListener("change",e=>{
   tmsg[t]=`${MODE_NAME[m]}のシステムを ${sel.value} にしました`;save();render()});
 document.querySelector(".tctrls").addEventListener("click",e=>{
   const b=e.target.closest("[data-act]");if(!b)return;const t=b.closest(".tctrl").dataset.team,m=modeOf(t),sh=shapeOf(t,m);
+  if(b.dataset.act==="flip"){flipTeam(t);tmsg[t]="スタメンの左右を反転しました(保存した配置はリセット)";save();render();renderEditor();return}
   if(b.dataset.act==="save"){sh.pos=Array.from({length:11},(_,s)=>({...slotPos(t,s,m)}));sh.work={};tmsg[t]=`${MODE_NAME[m]}の配置を保存しました`}
   if(b.dataset.act==="reset"){sh.work={};tmsg[t]=sh.pos||sh.fm?`保存した${MODE_NAME[m]}の配置に戻しました`:`${MODE_NAME[m]}は保存がないので、最初の配置に戻しました`}
   if(b.dataset.act==="init"){sh.fm=null;sh.pos=null;sh.work={};tmsg[t]=`${MODE_NAME[m]}を最初の状態(${S.data.teams[t].formation})に戻しました`}
@@ -579,6 +627,163 @@ $("importBtn").onclick=()=>{try{const d=JSON.parse($("json").value);
   S=fresh(d);save();renderEditor();render();$("jsonMsg").textContent="読み込みました(時間はキックオフに戻りました)";
   }catch(err){$("jsonMsg").textContent="読み込めませんでした。書き出したときの形式のJSONを貼り付けてください"}};
 $("sampleBtn").onclick=()=>{S=fresh(clone(SAMPLE));save();renderEditor();render();$("jsonMsg").textContent="サンプル試合に戻しました"};
+
+/* ---------- left/right flip for starters ---------- */
+function flipTeam(t){
+  const T=S.data.teams[t],st=T.players.filter(p=>p.starter),bn=T.players.filter(p=>!p.starter);
+  const out=[st[0]];let i=1;parseFm(T.formation).forEach(k=>{out.push(...st.slice(i,i+k).reverse());i+=k});out.push(...st.slice(i));
+  T.players=[...out.filter(Boolean),...bn];["atk","def"].forEach(m=>{S.shapes[t][m].pos=null;S.shapes[t][m].work={}});
+}
+function loadMatch(data){S=fresh(data);save();renderEditor();render()}
+
+/* ---------- API-Football (key stays in this browser only) ---------- */
+const API="https://v3.football.api-sports.io/";
+const LEAGUES=[[39,"プレミアリーグ"],[140,"ラ・リーガ"],[135,"セリエA"],[78,"ブンデスリーガ"],[61,"リーグ・アン"],[2,"CL"],[3,"EL"],[848,"ECL"]];
+const LG_NAME=Object.fromEntries(LEAGUES);
+const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
+  set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+const todayJST=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
+function shiftDate(d,n){const x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
+let quota=null;
+async function api(path){
+  const key=ls.get("tacboard.apikey","");
+  if(!key)throw new Error("APIキーが未設定です。下の「APIキーの設定」で入力してください。");
+  let r;
+  try{r=await fetch(API+path,{headers:{"x-apisports-key":key}})}
+  catch(e){throw new Error("通信できませんでした。ネット接続を確認してください。")}
+  const rem=r.headers.get("x-ratelimit-requests-remaining");if(rem!=null)quota=rem;
+  let j;try{j=await r.json()}catch(e){throw new Error("APIの応答を読み取れませんでした(HTTP "+r.status+")")}
+  const errs=j&&j.errors?(Array.isArray(j.errors)?j.errors:Object.values(j.errors)):[];
+  if(errs.length)throw new Error("APIエラー: "+errs.join(" / "));
+  return j.response||[];
+}
+function fmsg(id,text,err){$(id).textContent=text;$(id).classList.toggle("err",!!err)}
+const quotaText=()=>quota!=null?`(本日の残りリクエスト: ${quota})`:"";
+
+/* league filter */
+function renderLeagues(){
+  const sel=ls.get("tacboard.leagues",LEAGUES.map(l=>l[0])),all=ls.get("tacboard.allLeagues",false);
+  $("fLeagues").innerHTML=LEAGUES.map(([id,n])=>`<label><input type="checkbox" data-lg="${id}" ${sel.includes(id)?"checked":""}>${n}</label>`).join("")
+    +`<label><input type="checkbox" id="fAll" ${all?"checked":""}>その他のリーグも表示</label>`;
+}
+$("fLeagues").addEventListener("change",()=>{
+  ls.set("tacboard.leagues",[...document.querySelectorAll("[data-lg]:checked")].map(x=>+x.dataset.lg));
+  ls.set("tacboard.allLeagues",$("fAll").checked);if(lastFx)renderFixtures(lastFx);
+});
+
+/* fixture search: only kickoff time, league and team names are shown */
+let lastFx=null;
+function renderFixtures(list){
+  const sel=ls.get("tacboard.leagues",LEAGUES.map(l=>l[0])),all=ls.get("tacboard.allLeagues",false);
+  const rows=list.filter(f=>all||sel.includes(f.league.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
+  $("fList").innerHTML=rows.length?rows.map(f=>`<li><span class="ko">${esc(f.fixture.date.slice(11,16))}</span>
+      <span class="vs"><span class="lg">${esc(LG_NAME[f.league.id]||f.league.name)}</span>${esc(f.teams.home.name)} vs ${esc(f.teams.away.name)}</span>
+      <button class="ghost" data-fx="${f.fixture.id}">読み込む</button></li>`).join("")
+    :`<li style="display:block" class="empty">該当する試合はありません。リーグの選択や日付を変えてみてください。</li>`;
+}
+async function search(){
+  const date=$("fDate").value||todayJST();fmsg("fMsg","検索しています…");$("fList").innerHTML="";
+  try{
+    let list=ls.get("tacboard.fx."+date,null);
+    if(!list){list=await api(`fixtures?date=${date}&timezone=Asia/Tokyo`);
+      if(date<shiftDate(todayJST(),-1))ls.set("tacboard.fx."+date,list.map(slimFx))}
+    lastFx=list;renderFixtures(list);fmsg("fMsg",`${date} の試合 ${quotaText()}`);
+  }catch(e){fmsg("fMsg",e.message,true)}
+}
+/* keep only what the board needs; scores and status are dropped before caching */
+const slimFx=f=>({fixture:{id:f.fixture.id,date:f.fixture.date,timestamp:f.fixture.timestamp},
+  league:{id:f.league.id,name:f.league.name},teams:{home:{id:f.teams.home.id,name:f.teams.home.name},away:{id:f.teams.away.id,name:f.teams.away.name}},
+  done:["FT","AET","PEN"].includes(f.fixture.status&&f.fixture.status.short)});
+$("fSearch").onclick=search;
+$("fPrev").onclick=()=>{$("fDate").value=shiftDate($("fDate").value||todayJST(),-1);search()};
+$("fNext").onclick=()=>{$("fDate").value=shiftDate($("fDate").value||todayJST(),1);search()};
+
+/* convert API lineups + events into the board's data */
+function hex(c){return c&&/^[0-9a-f]{6}$/i.test(c)?"#"+c:null}
+function cdist(a,b){const p=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));const x=p(a),y=p(b);return Math.hypot(x[0]-y[0],x[1]-y[1],x[2]-y[2])}
+function convert(fx,lineups,events){
+  const teams={},side={};
+  ["home","away"].forEach(s=>{
+    const tm=fx.teams[s];side[tm.id]=s;
+    const L=lineups.find(l=>l.team&&l.team.id===tm.id)||{};
+    const grid=p=>{const g=String(p.grid||"").split(":").map(Number);return g.length===2&&g.every(n=>n>0)?g:[99,99]};
+    const xi=(L.startXI||[]).map(x=>x.player).sort((a,b)=>{const ga=grid(a),gb=grid(b);return ga[0]-gb[0]||ga[1]-gb[1]});
+    const subs=(L.substitutes||[]).map(x=>x.player);
+    const mk=(p,starter)=>({id:s+"-"+(p.id!=null?p.id:"n"+p.number),apiId:p.id,num:p.number!=null?String(p.number):"",name:p.name||"?",starter});
+    const col=L.team&&L.team.colors&&L.team.colors.player;
+    teams[s]={name:tm.name,color:hex(col&&col.primary)||(s==="home"?"#c8432f":"#2d63c4"),
+      formation:L.formation||"4-4-2",players:[...xi.map(p=>mk(p,true)),...subs.map(p=>mk(p,false))]};
+  });
+  if(cdist(teams.home.color,teams.away.color)<90){
+    const L=lineups.find(l=>l.team&&l.team.id===fx.teams.away.id),gk=L&&L.team.colors&&L.team.colors.player;
+    const alt=hex(gk&&gk.border);teams.away.color=alt&&cdist(alt,teams.home.color)>=90?alt:(cdist("#f2f2f2",teams.home.color)>=90?"#f2f2f2":"#222222");
+  }
+  const find=(s,p)=>{if(!p)return null;const ps=teams[s].players;
+    return (ps.find(x=>p.id!=null&&x.apiId===p.id)||ps.find(x=>x.name===p.name)||{}).id||null};
+  const byId=(s,p)=>p&&p.id!=null&&teams[s].players.some(x=>x.apiId===p.id);
+  const whose=p=>["home","away"].find(s=>byId(s,p))||["home","away"].find(s=>find(s,p));
+  const on={home:new Set(teams.home.players.filter(p=>p.starter).map(p=>p.id)),away:new Set(teams.away.players.filter(p=>p.starter).map(p=>p.id))};
+  const out=[];let n=0;
+  events.slice().sort((a,b)=>(a.time.elapsed-b.time.elapsed)||((a.time.extra||0)-(b.time.extra||0))).forEach(e=>{
+    const el=+e.time.elapsed||0,ex=+e.time.extra||0,pso=/shootout/i.test(e.comments||"");
+    const period=pso?"PK":el<=45?"1H":el<=90?"2H":el<=105?"ET1":"ET2";
+    let s=side[e.team&&e.team.id];const base={id:"a"+(n++),period,min:el,add:ex};
+    const type=String(e.type||"").toLowerCase(),det=String(e.detail||"").toLowerCase();
+    if(type==="goal"){
+      if(det.includes("missed")){if(pso&&s)out.push({...base,type:"pso_miss",team:s,player:find(s,e.player)});return}
+      if(det.includes("own")){const ps=whose(e.player)||s;if(ps)out.push({...base,type:"og",team:ps,player:find(ps,e.player)});return}
+      if(s)out.push({...base,type:pso?"pso_goal":"goal",team:s,player:find(s,e.player)});
+    }else if(type==="card"&&s&&!pso){
+      out.push({...base,type:det.includes("yellow")&&!det.includes("second")?"yellow":"red",team:s,player:find(s,e.player)});
+      if(!(det.includes("yellow")&&!det.includes("second")))on[s].delete(find(s,e.player));
+    }else if(type==="subst"&&s){
+      let o=find(s,e.player),i=find(s,e.assist);
+      if(o&&i&&!on[s].has(o)&&on[s].has(i))[o,i]=[i,o];
+      if(!o||!i)return;on[s].delete(o);on[s].add(i);
+      out.push({...base,type:"sub",team:s,player:o,playerIn:i});
+    }
+  });
+  return {teams,events:out};
+}
+async function loadFixture(fid){
+  const cached=ls.get("tacboard.match."+fid,null);
+  if(cached){loadMatch(cached);fmsg("fMsg","保存済みのデータを開きました(通信なし)");closeFinder();return}
+  const f=(lastFx||[]).find(x=>x.fixture.id===fid);if(!f)return;
+  fmsg("fMsg","読み込んでいます…");
+  try{
+    const [lineups,events]=await Promise.all([api("fixtures/lineups?fixture="+fid),api("fixtures/events?fixture="+fid)]);
+    if(!lineups.length){fmsg("fMsg","この試合のスタメンはまだ発表されていません。キックオフの約1時間前から取得できます。"+quotaText(),true);return}
+    const data=convert(f,lineups,events);
+    const done=f.done!=null?f.done:["FT","AET","PEN"].includes(f.fixture.status&&f.fixture.status.short);
+    if(done){ls.set("tacboard.match."+fid,data);
+      const rec=ls.get("tacboard.recent",[]).filter(r=>r.id!==fid);
+      rec.unshift({id:fid,date:f.fixture.date.slice(0,10),label:`${f.teams.home.name} vs ${f.teams.away.name}`,lg:LG_NAME[f.league.id]||f.league.name});
+      ls.set("tacboard.recent",rec.slice(0,20));renderRecent()}
+    loadMatch(data);
+    fmsg("fMsg",(done?"読み込みました ":"読み込みました。試合が終わる前のデータなので、出来事は途中までです ")+quotaText());closeFinder();
+  }catch(e){fmsg("fMsg",e.message,true)}
+}
+function closeFinder(){setTimeout(()=>{$("finder").open=false;window.scrollTo({top:0,behavior:"smooth"})},600)}
+$("fList").addEventListener("click",e=>{const b=e.target.closest("[data-fx]");if(b)loadFixture(+b.dataset.fx)});
+function renderRecent(){
+  const rec=ls.get("tacboard.recent",[]);$("fRecentBox").hidden=!rec.length;
+  $("fRecent").innerHTML=rec.map(r=>`<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}</span>
+    <span class="vs"><span class="lg">${esc(r.lg)}</span>${esc(r.label)}</span>
+    <span style="display:flex;gap:6px"><button class="ghost" data-open="${r.id}">開く</button><button class="del" data-forget="${r.id}" aria-label="一覧から消す">消す</button></span></li>`).join("");
+}
+$("fRecent").addEventListener("click",e=>{
+  const o=e.target.closest("[data-open]"),d=e.target.closest("[data-forget]");
+  if(o){const c=ls.get("tacboard.match."+o.dataset.open,null);if(c){loadMatch(c);fmsg("fMsg","保存済みのデータを開きました(通信なし)");closeFinder()}}
+  if(d){ls.del("tacboard.match."+d.dataset.forget);ls.set("tacboard.recent",ls.get("tacboard.recent",[]).filter(r=>String(r.id)!==d.dataset.forget));renderRecent()}
+});
+
+/* key settings */
+function renderKey(){const k=ls.get("tacboard.apikey","");$("fKey").value="";
+  fmsg("fKeyMsg",k?`保存済み(末尾 …${k.slice(-4)})`:"まだ保存されていません");if(!k)$("keyBox").open=true}
+$("fKeySave").onclick=()=>{const v=$("fKey").value.trim();if(!v){fmsg("fKeyMsg","キーを入力してください",true);return}ls.set("tacboard.apikey",v);renderKey()};
+$("fKeyDel").onclick=()=>{ls.del("tacboard.apikey");renderKey()};
+
+$("fDate").value=todayJST();renderLeagues();renderRecent();renderKey();
 
 buildChips();renderEditor();render();
 })();
