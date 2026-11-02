@@ -1,0 +1,587 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>観戦戦術ボード</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="戦術ボード">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<style>
+/* Layout: scoreboard strip → match-clock bar with update button → slate tactics board → bench & applied log → spoiler-gated editor */
+:root{
+  --bg:#e9eee9; --surface:#ffffff; --fg:#16201a; --muted:#5a6a60; --line:#d2dbd4;
+  --accent:#1e6a47; --accent-fg:#ffffff; --pending:#b8741a; --danger:#b23a2e;
+  --board:#1f3d31; --board-edge:#152b22; --chalk:rgba(244,248,240,.78);
+  --f-display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#101814; --surface:#18221d; --fg:#e4ece6; --muted:#97a89d; --line:#2c3a32;
+  --accent:#3fa774; --accent-fg:#06140d; --pending:#e0a24a; --danger:#e0675a;
+  --board:#1d3a2e; --board-edge:#0c1812; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#101814; --surface:#18221d; --fg:#e4ece6; --muted:#97a89d; --line:#2c3a32;
+  --accent:#3fa774; --accent-fg:#06140d; --pending:#e0a24a; --danger:#e0675a;
+  --board:#1d3a2e; --board-edge:#0c1812; color-scheme:dark}
+html,body{background:var(--bg);color:var(--fg)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.6;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
+.wrap{max-width:1100px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+button,select,input,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* scoreboard */
+.score{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px}
+.team{display:flex;align-items:center;gap:10px;min-width:0}
+.team.away{justify-content:flex-end;text-align:right}
+.team .nm{font-weight:700;font-size:16px;overflow-wrap:anywhere;min-width:0}
+.chip{width:14px;height:14px;border-radius:50%;flex:none;box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--line)}
+.mid{text-align:center}
+.goals{font-family:var(--f-display);font-weight:700;font-size:44px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.pk{font-family:var(--f-display);font-size:16px;color:var(--muted)}
+.clock{font-family:var(--f-display);font-size:15px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+
+/* time bar */
+.timebar{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;display:flex;flex-direction:column;gap:10px}
+.trow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.tlabel{font-family:var(--f-display);font-weight:700;font-size:30px;min-width:4.2em;font-variant-numeric:tabular-nums;line-height:1}
+.tlabel.diff{color:var(--pending)}
+.tseg{font-size:12px;color:var(--muted);letter-spacing:.08em}
+.steps{display:flex;gap:6px;flex-wrap:wrap}
+.step{min-width:48px;height:42px;padding:0 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-family:var(--f-display);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
+.steps{align-items:center;justify-content:flex-start}
+.tnow{min-width:5.4em;text-align:center;padding:0 6px}
+.tnow .tlabel{min-width:0}
+.segbtn.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.segbtn{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:3px 12px;font-size:13px}
+.update{margin-left:auto;background:var(--accent);color:var(--accent-fg);border:0;border-radius:8px;padding:10px 22px;font-weight:700;font-size:15px}
+.update:disabled{opacity:.4;cursor:default}
+.status{font-size:13px;color:var(--muted)}
+.status b{color:var(--pending)}
+
+/* board */
+.boardbox{background:var(--board-edge);border-radius:12px;padding:10px;overflow:hidden}
+svg#board{display:block;width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}
+.ghost{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 14px;font-size:14px}
+.possbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.plabel{font-size:13px;color:var(--muted)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.seg button{border:0;background:transparent;padding:7px 16px;font-size:14px;font-weight:500;display:flex;align-items:center;gap:6px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on{background:var(--accent);color:var(--accent-fg)}
+.possbar .ghost{margin-left:auto}
+.tctrls{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:700px){.tctrls{grid-template-columns:1fr}}
+.tctrl{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.tctrl .th{display:flex;align-items:center;gap:8px;font-weight:700;flex-wrap:wrap}
+.tctrl .mode{font-size:12px;font-weight:700;padding:1px 8px;border-radius:999px;border:1px solid currentColor;color:var(--accent)}
+.tctrl .mode.def{color:var(--pending)}
+.fmrow{display:grid;grid-template-columns:auto 1fr;gap:6px 10px;align-items:center;font-size:13px}
+.fmrow .lbl{color:var(--muted)}
+.fmrow .lbl.cur{color:var(--fg);font-weight:700}
+.fmrow select{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:4px 6px;min-width:0;max-width:12em}
+.fmrow .saved{font-size:11px;color:var(--muted);margin-left:6px}
+.tbtns{display:flex;gap:6px;flex-wrap:wrap}
+.tbtns .ghost{padding:5px 10px;font-size:13px}
+.tmsg{font-size:12px;color:var(--accent);min-height:1.2em}
+
+/* lower panels */
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:700px){.grid{grid-template-columns:1fr}}
+.tl{display:grid;grid-template-columns:minmax(0,1fr) 4.4em minmax(0,1fr);font-size:14px}
+.tl>div{padding:5px 8px;border-top:1px solid var(--line);min-width:0}
+.tl .hd{border-top:0;font-weight:700;font-size:13px;display:flex;align-items:center;gap:6px}
+.tl .hd.h{justify-content:flex-end}
+.tl .tm{text-align:center;font-family:var(--f-display);font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted);background:var(--bg)}
+.tl .tm.hd{background:transparent}
+.tl .c{display:flex;flex-direction:column;gap:3px}
+.tl .c.h{align-items:flex-end;text-align:right}
+.ev{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap}
+.c.h .ev{flex-direction:row-reverse}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:0}
+.panel h2{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:14px}
+.plist li{display:grid;grid-template-columns:2.2em 1fr auto;gap:6px;align-items:baseline}
+.num{font-family:var(--f-display);font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted);text-align:right}
+.tag{font-size:11px;padding:0 6px;border-radius:4px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.tag.in{color:var(--accent);border-color:currentColor}
+.tag.out{opacity:.8}
+.tag.red{color:var(--danger);border-color:currentColor}
+.plist li.gone{color:var(--muted)}
+.log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
+.log li{display:grid;grid-template-columns:3.6em auto 1fr;gap:8px;align-items:baseline}
+.log .t{font-family:var(--f-display);font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
+.badge{font-size:11px;font-weight:700;padding:0 6px;border-radius:4px;color:#fff;white-space:nowrap}
+.empty{color:var(--muted);font-size:13px;margin:0}
+
+/* editor */
+details.editor{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+details.editor>summary{padding:12px 16px;cursor:pointer;font-weight:700}
+details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);margin-left:8px}
+.ed{padding:0 16px 16px;display:flex;flex-direction:column;gap:16px}
+.edteams{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media (max-width:700px){.edteams{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0}
+.field input,.field select,.field textarea,.evform select,.evform input{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:6px 8px;color:var(--fg);font-size:14px;min-width:0}
+.field textarea{min-height:240px;font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.5;resize:vertical}
+.row2{display:grid;grid-template-columns:1fr 64px 110px;gap:8px}
+.hint{font-size:12px;color:var(--muted);margin:0}
+.evform{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
+.evform .field{flex:0 1 auto}
+.evform input[type=number]{width:64px}
+.evtable{width:100%;border-collapse:collapse;font-size:14px}
+.evtable td{border-top:1px solid var(--line);padding:5px 6px;vertical-align:middle}
+.evtable td:first-child{font-family:var(--f-display);font-weight:600;font-variant-numeric:tabular-nums;width:4em}
+.tblwrap{overflow-x:auto}
+.del{border:1px solid var(--line);background:transparent;border-radius:6px;padding:2px 10px;font-size:12px;color:var(--danger)}
+.jsonbox{display:flex;flex-direction:column;gap:8px}
+.jsonbox textarea{min-height:120px}
+.btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.msg{font-size:13px;color:var(--accent)}
+@media (prefers-reduced-motion:no-preference){.pl{transition:transform .35s ease}.pl.dragging{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <section class="score" aria-label="スコア">
+    <div class="team home"><span class="chip" id="chipH"></span><span class="nm" id="nameH"></span></div>
+    <div class="mid">
+      <div class="goals" id="goals">0 – 0</div>
+      <div class="pk" id="pkScore" hidden></div>
+      <div class="clock" id="appliedClock">キックオフ</div>
+    </div>
+    <div class="team away"><span class="nm" id="nameA"></span><span class="chip" id="chipA"></span></div>
+  </section>
+
+  <section class="timebar" aria-label="試合時間">
+    <div class="trow">
+      <div class="steps" id="steps">
+        <button class="step" data-step="-15" aria-label="15分戻す">−15</button>
+        <button class="step" data-step="-5" aria-label="5分戻す">−5</button>
+        <button class="step" data-step="-1" aria-label="1分戻す">−1</button>
+        <div class="tnow">
+          <div class="tlabel" id="pendLabel">0'</div>
+          <div class="tseg" id="pendSeg">前半</div>
+        </div>
+        <button class="step" data-step="1" aria-label="1分進める">+1</button>
+        <button class="step" data-step="5" aria-label="5分進める">+5</button>
+        <button class="step" data-step="15" aria-label="15分進める">+15</button>
+      </div>
+    </div>
+    <div class="trow">
+      <div class="chips" id="segChips"></div>
+      <button class="update" id="updateBtn">更新</button>
+    </div>
+    <div class="status" id="status"></div>
+  </section>
+
+  <div class="boardbox"><svg id="board" viewBox="-4 -4 113 76" aria-label="戦術ボード"></svg></div>
+
+  <div class="possbar">
+    <span class="plabel">ボール保持</span>
+    <div class="seg" id="possSeg" role="group" aria-label="ボール保持">
+      <button data-poss="home" id="possH">ホーム</button>
+      <button data-poss="away" id="possA">アウェイ</button>
+    </div>
+    <button class="ghost" id="resetAll">両チームとも保存した配置に戻す</button>
+  </div>
+
+  <div class="tctrls">
+    <section class="tctrl" data-team="home"></section>
+    <section class="tctrl" data-team="away"></section>
+  </div>
+
+  <section class="panel"><h2>反映済みの出来事</h2><div id="log"></div></section>
+
+  <div class="grid">
+    <section class="panel"><h2 id="benchHTitle">Home</h2><ul class="plist" id="benchH"></ul></section>
+    <section class="panel"><h2 id="benchATitle">Away</h2><ul class="plist" id="benchA"></ul></section>
+  </div>
+
+  <details class="editor" id="editor">
+    <summary>試合データを編集<span>開くと交代や得点が見えます</span></summary>
+    <div class="ed">
+      <div class="edteams" id="edTeams"></div>
+      <div>
+        <h3 style="margin:0 0 8px;font-size:15px">出来事</h3>
+        <div class="evform">
+          <label class="field">種類<select id="evType">
+            <option value="goal">得点</option><option value="og">オウンゴール</option>
+            <option value="sub">交代</option><option value="yellow">警告</option><option value="red">退場</option>
+            <option value="pso_goal">PK戦 成功</option><option value="pso_miss">PK戦 失敗</option></select></label>
+          <label class="field">チーム<select id="evTeam"><option value="home">ホーム</option><option value="away">アウェイ</option></select></label>
+          <label class="field" id="evPeriodF">区間<select id="evPeriod"></select></label>
+          <label class="field" id="evMinF">分<input type="number" id="evMin" min="0" max="130" value="1"></label>
+          <label class="field" id="evAddF">+AT<input type="number" id="evAdd" min="0" max="30" value="0"></label>
+          <label class="field"><span id="evPlayerLbl">選手</span><select id="evPlayer"></select></label>
+          <label class="field" id="evInF">IN<select id="evIn"></select></label>
+          <button class="ghost" id="evAddBtn">追加</button>
+        </div>
+        <div class="tblwrap"><table class="evtable"><tbody id="evRows"></tbody></table></div>
+      </div>
+      <div class="jsonbox">
+        <h3 style="margin:0;font-size:15px">データの書き出し・読み込み</h3>
+        <p class="hint">将来のAPI連携や、別端末への持ち出し用です。</p>
+        <textarea class="field" id="json" spellcheck="false" style="border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:8px;font-family:ui-monospace,Menlo,monospace;font-size:12px;min-height:120px"></textarea>
+        <div class="btns">
+          <button class="ghost" id="exportBtn">書き出してコピー</button>
+          <button class="ghost" id="importBtn">読み込む</button>
+          <button class="ghost" id="sampleBtn">サンプル試合に戻す</button>
+          <span class="msg" id="jsonMsg"></span>
+        </div>
+      </div>
+    </div>
+  </details>
+</div>
+
+<script>
+(function(){
+const FORMATIONS=["4-4-2","4-3-3","4-2-3-1","4-1-4-1","4-4-1-1","4-1-2-1-2","4-3-1-2","4-2-2-2","3-4-3","3-5-2","3-4-2-1","3-4-1-2","5-3-2","5-4-1"];
+const SEGS=[
+  {key:"1H",name:"前半",start:0,end:45},
+  {key:"2H",name:"後半",start:45,end:90},
+  {key:"ET1",name:"延長前半",start:90,end:105},
+  {key:"ET2",name:"延長後半",start:105,end:120},
+  {key:"PK",name:"PK戦"}
+];
+const MAX_AT=30;
+const TYPE_LABEL={goal:"得点",og:"OG",sub:"交代",yellow:"警告",red:"退場",pso_goal:"PK○",pso_miss:"PK×"};
+const TYPE_COLOR={goal:"#1e6a47",og:"#6b5a2e",sub:"#3a5f9e",yellow:"#b8901a",red:"#b23a2e",pso_goal:"#1e6a47",pso_miss:"#6c6c6c"};
+
+function P(t,list){return list.map(([num,name],i)=>({id:t+"-"+num,num,name,starter:i<11}))}
+const SAMPLE={
+
+  teams:{
+    home:{name:"ノルトハーフェン",color:"#c8432f",formation:"4-2-3-1",players:P("home",[
+      [1,"ブラント"],[2,"ケラー"],[4,"アルノ"],[5,"ジーモン"],[3,"ファルク"],
+      [6,"ロート"],[8,"ヴェーバー"],[7,"ニコ"],[10,"ハルトマン"],[11,"ベルガー"],[9,"ランゲ"],
+      [12,"ツィマー"],[14,"オルト"],[17,"フリッツ"],[19,"ザイデル"],[20,"クルーゲ"],[21,"マイ"],[23,"ポール"]])},
+    away:{name:"エスタディオ・ソラール",color:"#2d63c4",formation:"4-3-3",players:P("away",[
+      [13,"ベガ"],[2,"モラレス"],[5,"イバラ"],[4,"コルテス"],[3,"ルナ"],
+      [8,"サラス"],[6,"オルティス"],[10,"ミロ"],[7,"パレデス"],[9,"ガルセス"],[11,"リオス"],
+      [1,"カンポ"],[14,"アランダ"],[15,"デルガド"],[16,"ソト"],[18,"ナバロ"],[19,"ブエノ"],[22,"レジェス"]])}
+  },
+  events:[
+    {id:"e1",type:"goal",team:"home",period:"1H",min:23,add:0,player:"home-9"},
+    {id:"e2",type:"yellow",team:"away",period:"1H",min:38,add:0,player:"away-6"},
+    {id:"e3",type:"sub",team:"away",period:"2H",min:72,add:0,player:"away-11",playerIn:"away-18"},
+    {id:"e4",type:"sub",team:"home",period:"2H",min:72,add:0,player:"home-7",playerIn:"home-17"},
+    {id:"e5",type:"red",team:"home",period:"2H",min:81,add:0,player:"home-5"},
+    {id:"e6",type:"sub",team:"home",period:"2H",min:83,add:0,player:"home-9",playerIn:"home-14"},
+    {id:"e7",type:"goal",team:"away",period:"2H",min:90,add:3,player:"away-9"},
+    {id:"e8",type:"sub",team:"away",period:"ET1",min:96,add:0,player:"away-10",playerIn:"away-15"},
+    {id:"e9",type:"goal",team:"away",period:"ET2",min:112,add:0,player:"away-15"}
+  ]
+};
+const clone=o=>JSON.parse(JSON.stringify(o));
+const KEY="tacboard.v1";
+let S=null;
+try{S=JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){S=null}
+if(!S||!S.data||!S.data.teams){S=fresh(clone(SAMPLE))}
+if(typeof S.pending!=="object"||!S.pending)S.pending=kick();
+if(typeof S.applied!=="object"||!S.applied)S.applied=kick();
+if(!S.shapes){S.shapes=newShapes();S.poss="home";delete S.overrides;delete S.live}
+function kick(){return {seg:"1H",min:0,add:0}}
+function newShape(){return {fm:null,pos:null,work:{}}}
+function newShapes(){return {home:{atk:newShape(),def:newShape()},away:{atk:newShape(),def:newShape()}}}
+function fresh(data){return {data,shapes:newShapes(),poss:"home",pending:kick(),applied:kick()}}
+const MODE_NAME={atk:"保持時",def:"非保持時"};
+const modeOf=t=>S.poss===t?"atk":"def";
+const shapeOf=(t,m=modeOf(t))=>S.shapes[t][m];
+const fmOf=(t,m)=>shapeOf(t,m).fm||S.data.teams[t].formation;
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+/* ---------- match clock (no bar: total length is never shown) ---------- */
+const segI=k=>SEGS.findIndex(s=>s.key===k);
+function lower(s){return s.start}
+function norm(t){
+  const i=segI(t.seg);const s=SEGS[i];
+  if(!s||s.key==="PK")return {seg:"PK",min:0,add:0};
+  let min=Math.round(+t.min||0),add=Math.round(+t.add||0);
+  if(min>s.end){add+=min-s.end;min=s.end}
+  if(add>0)min=s.end;
+  if(min<lower(s))min=lower(s);
+  return {seg:s.key,min,add:Math.max(0,add)};
+}
+function ord(t){t=norm(t);return segI(t.seg)*100000+t.min*100+t.add}
+function tLabel(t){t=norm(t);if(t.seg==="PK")return "PK戦";if(t.seg==="1H"&&t.min===0)return "0'";return t.add?t.min+"+"+t.add+"'":t.min+"'"}
+function tSeg(t){t=norm(t);if(t.seg==="1H"&&t.min===0)return "キックオフ";const s=SEGS[segI(t.seg)];return s.name+(t.add?" AT":"")}
+function evTime(e){return (e.type==="pso_goal"||e.type==="pso_miss")?{seg:"PK",min:0,add:0}:{seg:e.period,min:e.min,add:e.add}}
+const evOrd=e=>ord(evTime(e));
+const evLabel=e=>{const t=norm(evTime(e));return t.seg==="PK"?"PK":tLabel(t)};
+function step(n){
+  let t=norm(S.pending);const i=segI(t.seg);
+  if(t.seg==="PK"){if(n<0)t={seg:"ET2",min:120,add:0};S.pending=t;return}
+  const s=SEGS[i];const v=t.min+t.add+n;
+  if(v>s.end)t={seg:s.key,min:s.end,add:Math.min(v-s.end,MAX_AT)};
+  else if(v<lower(s))t=i>0?{seg:SEGS[i-1].key,min:SEGS[i-1].end,add:0}:kick();
+  else t={seg:s.key,min:v,add:0};
+  S.pending=t;
+}
+function jump(k){const s=SEGS[segI(k)];S.pending=k==="PK"?{seg:"PK",min:0,add:0}:{seg:k,min:lower(s),add:0}}
+function buildChips(){$("segChips").innerHTML=SEGS.map(s=>`<button class="segbtn" data-seg="${s.key}">${s.name}</button>`).join("")}
+
+/* ---------- state at time ---------- */
+function players(t){return S.data.teams[t].players}
+function pmap(){const m={};["home","away"].forEach(t=>players(t).forEach(p=>m[p.id]=p));return m}
+function compute(t){const idx=ord(t);
+  const st={slots:{},score:{home:0,away:0},pk:{home:0,away:0},pkUsed:false,log:[],tags:{}};
+  ["home","away"].forEach(t=>{st.slots[t]=players(t).filter(p=>p.starter).slice(0,11).map(p=>p.id);while(st.slots[t].length<11)st.slots[t].push(null)});
+  const evs=S.data.events.map((e,o)=>({e,o,i:evOrd(e)})).filter(x=>x.i<=idx).sort((a,b)=>a.i-b.i||a.o-b.o);
+  const tag=(id,cls,txt)=>{(st.tags[id]=st.tags[id]||[]).push({cls,txt})};
+  evs.forEach(({e})=>{
+    const sl=st.slots[e.team]||[];const lab=evLabel(e);
+    if(e.type==="sub"){const k=sl.indexOf(e.player);if(k>=0&&e.playerIn)sl[k]=e.playerIn;tag(e.player,"out","OUT "+lab);tag(e.playerIn,"in","IN "+lab)}
+    else if(e.type==="red"){const k=sl.indexOf(e.player);if(k>=0)sl[k]=null;tag(e.player,"red","退場 "+lab)}
+    else if(e.type==="goal")st.score[e.team]++;
+    else if(e.type==="og")st.score[e.team==="home"?"away":"home"]++;
+    else if(e.type==="pso_goal"){st.pk[e.team]++;st.pkUsed=true}
+    else if(e.type==="pso_miss")st.pkUsed=true;
+    st.log.push(e);
+  });
+  return st;
+}
+
+/* ---------- layout ---------- */
+function parseFm(f){let l=String(f||"").split("-").map(n=>parseInt(n,10)).filter(n=>n>0);if(l.reduce((a,b)=>a+b,0)!==10)l=[4,4,2];return l}
+/* default shape: in possession the lines push up and spread, out of possession they sit compact */
+function defaultLayout(team,m){
+  const lines=parseFm(fmOf(team,m));const atk=m==="atk";
+  const x0=atk?22:12,x1=atk?60:37,gk=atk?7:4.5,w=atk?62:56;
+  const pos=[{x:gk,y:34}];const n=lines.length;
+  lines.forEach((k,li)=>{const x=n===1?(x0+x1)/2:x0+(x1-x0)*li/(n-1);
+    for(let i=0;i<k;i++)pos.push({x,y:34+w/2-w*(i+1)/(k+1)})});
+  return team==="home"?pos:pos.map(p=>({x:105-p.x,y:68-p.y}));
+}
+/* what the board shows for a slot: dragged → saved → default */
+function slotPos(team,s,m=modeOf(team)){
+  const sh=shapeOf(team,m);
+  return sh.work[s]||(sh.pos&&sh.pos[s])||defaultLayout(team,m)[s];
+}
+
+/* ---------- render ---------- */
+const PITCH=`
+<rect x="-4" y="-4" width="113" height="76" fill="var(--board)"/>
+<g fill="none" stroke="var(--chalk)" stroke-width=".32">
+<rect x="0" y="0" width="105" height="68"/><line x1="52.5" y1="0" x2="52.5" y2="68"/>
+<circle cx="52.5" cy="34" r="9.15"/>
+<rect x="0" y="13.84" width="16.5" height="40.32"/><rect x="88.5" y="13.84" width="16.5" height="40.32"/>
+<rect x="0" y="24.84" width="5.5" height="18.32"/><rect x="99.5" y="24.84" width="5.5" height="18.32"/>
+<path d="M16.5 26.69 A9.15 9.15 0 0 1 16.5 41.31"/><path d="M88.5 26.69 A9.15 9.15 0 0 0 88.5 41.31"/>
+<rect x="-2" y="30.34" width="2" height="7.32"/><rect x="105" y="30.34" width="2" height="7.32"/>
+<path d="M0 1A1 1 0 0 0 1 0M104 0A1 1 0 0 0 105 1M0 67A1 1 0 0 1 1 68M104 68A1 1 0 0 1 105 67"/>
+</g>
+<g fill="var(--chalk)"><circle cx="52.5" cy="34" r=".35"/><circle cx="11" cy="34" r=".35"/><circle cx="94" cy="34" r=".35"/></g>`;
+function textOn(hex){const h=hex.replace("#","");if(h.length<6)return "#fff";const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return (r*299+g*587+b*114)/1000>150?"#111":"#fff"}
+function render(){
+  const st=compute(S.applied),pm=pmap(),T=S.data.teams;
+  $("nameH").textContent=T.home.name;$("nameA").textContent=T.away.name;
+  $("chipH").style.background=T.home.color;$("chipA").style.background=T.away.color;
+  $("goals").textContent=st.score.home+" – "+st.score.away;
+  $("pkScore").hidden=!st.pkUsed;$("pkScore").textContent="PK "+st.pk.home+" – "+st.pk.away;
+  const ap=norm(S.applied);$("appliedClock").textContent=(ap.seg==="1H"&&ap.min===0)?"キックオフ":ap.seg==="PK"?"PK戦":tSeg(ap)+" "+tLabel(ap);
+  // board
+  let g="";
+  ["home","away"].forEach(t=>{
+    const col=T[t].color,fg=textOn(col);
+    st.slots[t].forEach((pid,s)=>{
+      if(!pid)return;const p=pm[pid];if(!p)return;
+      const o=slotPos(t,s);
+      const gk=s===0;
+      g+=`<g class="pl" data-team="${t}" data-slot="${s}" transform="translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})" style="cursor:grab">
+        <circle r="3.4" fill="transparent"/>
+        ${gk?`<circle r="2.95" fill="none" stroke="${col}" stroke-width=".45"/>`:""}
+        <circle r="2.4" fill="${gk?"#e9e4d6":col}" stroke="rgba(0,0,0,.45)" stroke-width=".25"/>
+        <text y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${gk?"#111":fg}">${esc(p.num)}</text>
+        <text y="4.9" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(p.name)}</text>
+      </g>`;
+    });
+  });
+  $("board").innerHTML=PITCH+g;
+  // benches / squads
+  ["home","away"].forEach(t=>{
+    const on=new Set(st.slots[t]);
+    $(t==="home"?"benchHTitle":"benchATitle").textContent=T[t].name;
+    $(t==="home"?"benchH":"benchA").innerHTML=players(t).map(p=>{
+      const tags=(st.tags[p.id]||[]).map(x=>`<span class="tag ${x.cls}">${esc(x.txt)}</span>`).join(" ");
+      const gone=!on.has(p.id);
+      return `<li class="${gone?"gone":""}"><span class="num">${esc(p.num)}</span><span>${esc(p.name)}${p.starter?"":` <span class="tag">控え</span>`}</span><span>${tags}</span></li>`;
+    }).join("");
+  });
+  // log: one row per moment, home left / away right
+  if(!st.log.length){$("log").innerHTML=`<p class="empty">まだ反映された出来事はありません。</p>`}
+  else{
+    const n=id=>pm[id]?pm[id].name:"?";
+    const evHtml=e=>{const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:n(e.player);
+      return `<div class="ev"><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span><span>${esc(txt)}</span></div>`};
+    const rows=[];st.log.forEach(e=>{const k=evOrd(e);let r=rows[rows.length-1];
+      if(!r||r.k!==k){r={k,label:evLabel(e),home:[],away:[]};rows.push(r)}r[e.team].push(e)});
+    $("log").innerHTML=`<div class="tl">
+      <div class="hd h">${esc(T.home.name)}<span class="chip" style="background:${T.home.color}"></span></div><div class="tm hd"></div>
+      <div class="hd"><span class="chip" style="background:${T.away.color}"></span>${esc(T.away.name)}</div>
+      ${rows.map(r=>`<div class="c h">${r.home.map(evHtml).join("")}</div><div class="tm">${esc(r.label)}</div><div class="c">${r.away.map(evHtml).join("")}</div>`).join("")}
+    </div>`;
+  }
+  renderTime();renderFmSelects();
+}
+function renderTime(){
+  const p=norm(S.pending),a=norm(S.applied),diff=ord(p)!==ord(a);
+  $("pendLabel").textContent=tLabel(p);$("pendLabel").classList.toggle("diff",diff);
+  $("pendSeg").textContent=tSeg(p);
+  document.querySelectorAll(".segbtn").forEach(b=>b.classList.toggle("on",b.dataset.seg===p.seg));
+  $("updateBtn").disabled=!diff;
+  $("status").innerHTML=diff?`ボードは <b>${esc(tLabel(a))}</b> の状態です。「更新」で ${esc(tLabel(p))} まで反映します。`
+    :`見終えた時間に合わせて「更新」を押すと、そこまでの交代・退場・得点を反映します。`;
+}
+const tmsg={home:"",away:""};
+function renderFmSelects(){
+  const T=S.data.teams;
+  $("possH").innerHTML=`<span class="chip" style="background:${T.home.color}"></span>${esc(T.home.name)}`;
+  $("possA").innerHTML=`<span class="chip" style="background:${T.away.color}"></span>${esc(T.away.name)}`;
+  $("possH").classList.toggle("on",S.poss==="home");$("possA").classList.toggle("on",S.poss==="away");
+  $("possH").setAttribute("aria-pressed",S.poss==="home");$("possA").setAttribute("aria-pressed",S.poss==="away");
+  document.querySelectorAll(".tctrl").forEach(el=>{
+    const t=el.dataset.team,cur=modeOf(t);
+    const row=m=>{const f=fmOf(t,m),list=FORMATIONS.includes(f)?FORMATIONS:[f,...FORMATIONS],sh=shapeOf(t,m);
+      const note=sh.pos?"配置を保存済み":(sh.fm?"システム変更済み":"");
+      return `<span class="lbl ${m===cur?"cur":""}">${MODE_NAME[m]}</span>
+        <span><select data-m="${m}" aria-label="${esc(T[t].name)} ${MODE_NAME[m]}のシステム">${list.map(x=>`<option ${x===f?"selected":""}>${esc(x)}</option>`).join("")}</select><span class="saved">${note}</span></span>`};
+    el.innerHTML=`<div class="th"><span class="chip" style="background:${T[t].color}"></span>${esc(T[t].name)}
+        <span class="mode ${cur}">${MODE_NAME[cur]}を表示中</span></div>
+      <div class="fmrow">${row("atk")}${row("def")}</div>
+      <div class="tbtns">
+        <button class="ghost" data-act="save">今の配置を保存</button>
+        <button class="ghost" data-act="reset">保存した配置に戻す</button>
+        <button class="ghost" data-act="init">最初の状態に戻す</button>
+      </div>
+      <div class="tmsg">${esc(tmsg[t])}</div>`;
+  });
+}
+
+/* ---------- time controls ---------- */
+$("steps").addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;step(+b.dataset.step);renderTime();save()});
+$("segChips").addEventListener("click",e=>{const b=e.target.closest("[data-seg]");if(!b)return;jump(b.dataset.seg);renderTime();save()});
+$("updateBtn").onclick=()=>{S.applied=norm(S.pending);save();render()};
+
+/* ---------- formation & reset ---------- */
+$("possSeg").addEventListener("click",e=>{const b=e.target.closest("[data-poss]");if(!b)return;
+  S.poss=b.dataset.poss;tmsg.home=tmsg.away="";save();render()});
+document.querySelector(".tctrls").addEventListener("change",e=>{
+  const sel=e.target.closest("select[data-m]");if(!sel)return;const t=sel.closest(".tctrl").dataset.team,m=sel.dataset.m;
+  const sh=shapeOf(t,m);sh.fm=sel.value===S.data.teams[t].formation?null:sel.value;sh.pos=null;sh.work={};
+  tmsg[t]=`${MODE_NAME[m]}のシステムを ${sel.value} にしました`;save();render()});
+document.querySelector(".tctrls").addEventListener("click",e=>{
+  const b=e.target.closest("[data-act]");if(!b)return;const t=b.closest(".tctrl").dataset.team,m=modeOf(t),sh=shapeOf(t,m);
+  if(b.dataset.act==="save"){sh.pos=Array.from({length:11},(_,s)=>({...slotPos(t,s,m)}));sh.work={};tmsg[t]=`${MODE_NAME[m]}の配置を保存しました`}
+  if(b.dataset.act==="reset"){sh.work={};tmsg[t]=sh.pos||sh.fm?`保存した${MODE_NAME[m]}の配置に戻しました`:`${MODE_NAME[m]}は保存がないので、最初の配置に戻しました`}
+  if(b.dataset.act==="init"){sh.fm=null;sh.pos=null;sh.work={};tmsg[t]=`${MODE_NAME[m]}を最初の状態(${S.data.teams[t].formation})に戻しました`}
+  save();render()});
+$("resetAll").onclick=()=>{["home","away"].forEach(t=>{["atk","def"].forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});save();render()};
+
+/* ---------- drag ---------- */
+const svg=$("board");let drag=null;
+function svgPt(ev){const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;return pt.matrixTransform(svg.getScreenCTM().inverse())}
+svg.addEventListener("pointerdown",ev=>{
+  const g=ev.target.closest(".pl");if(!g)return;ev.preventDefault();
+  const p=svgPt(ev);const m=/translate\(([-\d.]+) ([-\d.]+)\)/.exec(g.getAttribute("transform"));
+  drag={g,dx:+m[1]-p.x,dy:+m[2]-p.y,x:+m[1],y:+m[2]};g.classList.add("dragging");g.style.cursor="grabbing";
+  svg.appendChild(g);try{svg.setPointerCapture(ev.pointerId)}catch(e){}
+});
+svg.addEventListener("pointermove",ev=>{if(!drag)return;const p=svgPt(ev);
+  drag.x=Math.max(-2,Math.min(107,p.x+drag.dx));drag.y=Math.max(-2,Math.min(70,p.y+drag.dy));
+  drag.g.setAttribute("transform",`translate(${drag.x.toFixed(2)} ${drag.y.toFixed(2)})`)});
+function endDrag(){if(!drag)return;const g=drag.g;shapeOf(g.dataset.team).work[g.dataset.slot]={x:drag.x,y:drag.y};
+  g.classList.remove("dragging");g.style.cursor="grab";drag=null;save()}
+svg.addEventListener("pointerup",endDrag);svg.addEventListener("pointercancel",endDrag);
+
+/* ---------- editor ---------- */
+function teamEditor(t){
+  const T=S.data.teams[t];
+  const st=T.players.filter(p=>p.starter).map(p=>p.num+" "+p.name).join("\n");
+  const bn=T.players.filter(p=>!p.starter).map(p=>p.num+" "+p.name).join("\n");
+  return `<div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+    <h3 style="margin:0;font-size:15px">${t==="home"?"ホーム":"アウェイ"}</h3>
+    <div class="row2">
+      <label class="field">チーム名<input id="ed-${t}-name" value="${esc(T.name)}"></label>
+      <label class="field">色<input type="color" id="ed-${t}-color" value="${esc(T.color)}" style="padding:2px;height:36px"></label>
+      <label class="field">システム<input id="ed-${t}-fm" value="${esc(T.formation)}" placeholder="4-2-3-1"></label>
+    </div>
+    <label class="field">選手(1行に「背番号 名前」)<textarea id="ed-${t}-pl" spellcheck="false">${esc(st+"\n---\n"+bn)}</textarea></label>
+    <p class="hint">上から11人がスタメンです。GK、DF(右→左)、MF(右→左)、FWの順に並べるとシステム通りに配置されます。「---」の下が控えです。</p>
+  </div>`;
+}
+function parsePl(t,text){
+  const out=[];let bench=false,count=0;const seen={};
+  text.split("\n").forEach(line=>{line=line.trim();if(!line)return;if(/^-{3,}$/.test(line)){bench=true;return}
+    const m=/^(\d+)\s*(.*)$/.exec(line);const num=m?m[1]:"";const name=m?(m[2]||"#"+m[1]):line;
+    let id=t+"-"+(num||"x");while(seen[id])id+="_";seen[id]=1;
+    const starter=!bench&&count<11;if(starter)count++;out.push({id,num,name,starter})});
+  return out;
+}
+function renderEditor(){
+  $("edTeams").innerHTML=teamEditor("home")+teamEditor("away");
+  ["home","away"].forEach(t=>{
+    $(`ed-${t}-name`).onchange=e=>{S.data.teams[t].name=e.target.value;commit()};
+    $(`ed-${t}-color`).oninput=e=>{S.data.teams[t].color=e.target.value;commit(false)};
+    $(`ed-${t}-fm`).onchange=e=>{S.data.teams[t].formation=e.target.value.trim();commit()};
+    $(`ed-${t}-pl`).onchange=e=>{S.data.teams[t].players=parsePl(t,e.target.value);commit()};
+  });
+  $("evPeriod").innerHTML=SEGS.filter(s=>s.key!=="PK").map(s=>`<option value="${s.key}">${s.name}</option>`).join("");
+  fillEvPlayers();renderEvRows();
+}
+function fillEvPlayers(){
+  const t=$("evTeam").value,ty=$("evType").value;
+  const opts=players(t).map(p=>`<option value="${esc(p.id)}">${esc(p.num)} ${esc(p.name)}</option>`).join("");
+  $("evPlayer").innerHTML=opts;$("evIn").innerHTML=players(t).filter(p=>!p.starter).map(p=>`<option value="${esc(p.id)}">${esc(p.num)} ${esc(p.name)}</option>`).join("")||opts;
+  $("evInF").hidden=ty!=="sub";$("evPlayerLbl").textContent=ty==="sub"?"OUT":"選手";
+  const pso=ty.startsWith("pso");$("evPeriodF").hidden=pso;$("evMinF").hidden=pso;$("evAddF").hidden=pso;
+}
+$("evTeam").onchange=fillEvPlayers;$("evType").onchange=fillEvPlayers;
+$("evPeriod").onchange=()=>{const s=SEGS.find(x=>x.key===$("evPeriod").value);$("evMin").value=s.start;$("evAdd").value=0};
+function renderEvRows(){
+  const pm=pmap(),T=S.data.teams;
+  const rows=S.data.events.map((e,o)=>({e,o,i:evOrd(e)})).sort((a,b)=>a.i-b.i||a.o-b.o);
+  $("evRows").innerHTML=rows.length?rows.map(({e})=>{
+    const n=id=>pm[id]?pm[id].num+" "+pm[id].name:"(不明)";
+    const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:n(e.player);
+    return `<tr><td>${esc(evLabel(e))}</td><td><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span></td><td>${esc(T[e.team].name)}</td><td>${esc(txt)}</td><td style="text-align:right"><button class="del" data-del="${esc(e.id)}">削除</button></td></tr>`}).join("")
+    :`<tr><td colspan="5" class="empty">出来事はまだありません。</td></tr>`;
+}
+$("evRows").addEventListener("click",e=>{const b=e.target.closest("[data-del]");if(!b)return;
+  S.data.events=S.data.events.filter(x=>x.id!==b.dataset.del);commit()});
+$("evAddBtn").onclick=()=>{
+  const ty=$("evType").value,pso=ty.startsWith("pso");
+  const e={id:"e"+Date.now().toString(36),type:ty,team:$("evTeam").value,period:pso?"PK":$("evPeriod").value,
+    min:pso?120:+$("evMin").value||0,add:pso?0:+$("evAdd").value||0,player:$("evPlayer").value};
+  if(ty==="sub")e.playerIn=$("evIn").value;
+  if(!e.player)return;S.data.events.push(e);commit();
+};
+function commit(full=true){save();render();if(full){renderEvRows();fillEvPlayers()}}
+
+$("exportBtn").onclick=()=>{const s=JSON.stringify(S.data,null,1);$("json").value=s;
+  const done=()=>{$("jsonMsg").textContent="コピーしました"};
+  try{navigator.clipboard.writeText(s).then(done,()=>{$("json").select();$("jsonMsg").textContent="選択しました。コピーしてください"})}catch(err){$("json").select()}};
+$("importBtn").onclick=()=>{try{const d=JSON.parse($("json").value);
+  if(!d.teams||!d.teams.home||!d.teams.away||!Array.isArray(d.events))throw 0;
+  S=fresh(d);save();renderEditor();render();$("jsonMsg").textContent="読み込みました(時間はキックオフに戻りました)";
+  }catch(err){$("jsonMsg").textContent="読み込めませんでした。書き出したときの形式のJSONを貼り付けてください"}};
+$("sampleBtn").onclick=()=>{S=fresh(clone(SAMPLE));save();renderEditor();render();$("jsonMsg").textContent="サンプル試合に戻しました"};
+
+buildChips();renderEditor();render();
+})();
+</script>
+</body>
+</html>
