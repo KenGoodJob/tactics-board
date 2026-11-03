@@ -275,6 +275,15 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
         <p class="hint">前日と当日の試合一覧(2回)と、終わった試合1つにつき2回、APIを使います。終わった試合だけを保存し、結果は表示しません。</p>
         <div class="fmsg" id="tmMsg"></div>
       </div>
+      <div class="tmbox" id="nmBox">
+        <h3 class="sub">名前の日本語表記</h3>
+        <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="nmJa"> チーム名・選手名を日本語で表示する</label>
+        <p class="hint" id="nmInfo"></p>
+        <div class="frow"><button class="ghost" id="nmCopy">未登録の名前をコピー</button><button class="ghost" id="nmShare">ファイルに書き出す</button></div>
+        <p class="hint">コピーした内容を Claude の戦術ボードアプリのプロジェクトのチャットに貼ると、対応表に追加します。追加後にこのアプリを開き直すと日本語で表示されます。対応表に無い名前は英語のままです。</p>
+        <div class="fmsg" id="nmMsg"></div>
+        <textarea id="nmText" readonly hidden rows="6" style="width:100%;box-sizing:border-box;font-size:12px;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:6px 8px"></textarea>
+      </div>
       <div class="tmbox">
         <h3 class="sub">ファイルに書き出す・読み込む</h3>
         <div class="frow"><button class="ghost" id="fxExport">読み込んだ試合を書き出す</button><button class="ghost" id="fxImport">ファイルから読み込む</button>
@@ -332,7 +341,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104004549">20261104004549</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104012623">20261104012623</span></p>
 </div>
 
 <script>
@@ -500,7 +509,7 @@ const PITCH=`
 function textOn(hex){const h=hex.replace("#","");if(h.length<6)return "#fff";const r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);return (r*299+g*587+b*114)/1000>150?"#111":"#fff"}
 function render(){
   const st=compute(S.applied),pm=pmap(),T=S.data.teams;
-  $("nameH").textContent=T.home.name;$("nameA").textContent=T.away.name;
+  $("nameH").textContent=tName(T.home.apiId,T.home.name);$("nameA").textContent=tName(T.away.apiId,T.away.name);
   $("chipH").style.background=T.home.color;$("chipA").style.background=T.away.color;
   setLogo($("logoH"),T.home.apiId);setLogo($("logoA"),T.away.apiId);
   $("goals").textContent=st.score.home+" – "+st.score.away;
@@ -519,7 +528,7 @@ function render(){
         ${gk?`<circle r="2.95" fill="none" stroke="${col}" stroke-width=".45"/>`:""}
         <circle r="2.4" fill="${gk?"#e9e4d6":col}" stroke="rgba(0,0,0,.45)" stroke-width=".25"/>
         <text y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${gk?"#111":fg}">${esc(p.num)}</text>
-        <text y="4.9" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(p.name)}</text>
+        <text y="4.9" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(pShort(p))}</text>
       </g>`;
     });
   });
@@ -527,24 +536,24 @@ function render(){
   // benches / squads
   ["home","away"].forEach(t=>{
     const on=new Set(st.slots[t]);
-    $(t==="home"?"benchHTitle":"benchATitle").innerHTML=logo(T[t].apiId)+esc(T[t].name);
+    $(t==="home"?"benchHTitle":"benchATitle").innerHTML=logo(T[t].apiId)+esc(tName(T[t].apiId,T[t].name));
     $(t==="home"?"benchH":"benchA").innerHTML=players(t).map(p=>{
       const tags=(st.tags[p.id]||[]).map(x=>`<span class="tag ${x.cls}">${esc(x.txt)}</span>`).join(" ");
       const gone=!on.has(p.id);
-      return `<li class="${gone?"gone":""}"><span class="num">${esc(p.num)}</span><span>${esc(p.name)}${p.starter?"":` <span class="tag">控え</span>`}</span><span>${tags}</span></li>`;
+      return `<li class="${gone?"gone":""}"><span class="num">${esc(p.num)}</span><span>${esc(pName(p))}${p.starter?"":` <span class="tag">控え</span>`}</span><span>${tags}</span></li>`;
     }).join("");
   });
   // log: one row per moment, home left / away right
   if(!st.log.length){$("log").innerHTML=`<p class="empty">まだ反映された出来事はありません。</p>`}
   else{
-    const n=id=>pm[id]?pm[id].name:"?";
+    const n=id=>pm[id]?pShort(pm[id]):"?";
     const evHtml=e=>{const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:n(e.player);
       return `<div class="ev"><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span><span>${esc(txt)}</span></div>`};
     const rows=[];st.log.forEach(e=>{const k=evOrd(e);let r=rows[rows.length-1];
       if(!r||r.k!==k){r={k,label:evLabel(e),home:[],away:[]};rows.push(r)}r[e.team].push(e)});
     $("log").innerHTML=`<div class="tl">
-      <div class="hd h">${esc(T.home.name)}${logo(T.home.apiId)}<span class="chip" style="background:${T.home.color}"></span></div><div class="tm hd"></div>
-      <div class="hd"><span class="chip" style="background:${T.away.color}"></span>${logo(T.away.apiId)}${esc(T.away.name)}</div>
+      <div class="hd h">${esc(tName(T.home.apiId,T.home.name))}${logo(T.home.apiId)}<span class="chip" style="background:${T.home.color}"></span></div><div class="tm hd"></div>
+      <div class="hd"><span class="chip" style="background:${T.away.color}"></span>${logo(T.away.apiId)}${esc(tName(T.away.apiId,T.away.name))}</div>
       ${rows.map(r=>`<div class="c h">${r.home.map(evHtml).join("")}</div><div class="tm">${esc(r.label)}</div><div class="c">${r.away.map(evHtml).join("")}</div>`).join("")}
     </div>`;
   }
@@ -562,8 +571,8 @@ function renderTime(){
 const tmsg={home:"",away:""};
 function renderFmSelects(){
   const T=S.data.teams;
-  $("possH").innerHTML=`<span class="chip" style="background:${T.home.color}"></span>${logo(T.home.apiId)}${esc(T.home.name)} 保持`;
-  $("possA").innerHTML=`<span class="chip" style="background:${T.away.color}"></span>${logo(T.away.apiId)}${esc(T.away.name)} 保持`;
+  $("possH").innerHTML=`<span class="chip" style="background:${T.home.color}"></span>${logo(T.home.apiId)}${esc(tName(T.home.apiId,T.home.name))} 保持`;
+  $("possA").innerHTML=`<span class="chip" style="background:${T.away.color}"></span>${logo(T.away.apiId)}${esc(tName(T.away.apiId,T.away.name))} 保持`;
   $("autoEnds").checked=S.autoEnds!==false;$("swapEnds").classList.toggle("on",!!S.endSwap);$("swapEnds").setAttribute("aria-pressed",!!S.endSwap);
   [["possN","none"],["possH","home"],["possA","away"]].forEach(([id,v])=>{$(id).classList.toggle("on",S.poss===v);$(id).setAttribute("aria-pressed",S.poss===v)});
   document.querySelectorAll(".tctrl").forEach(el=>{
@@ -572,7 +581,7 @@ function renderFmSelects(){
       const note=sh.pos?"配置を保存済み":(sh.fm?"システム変更済み":"");
       return `<span class="lbl ${m===cur?"cur":""}">${MODE_NAME[m]}</span>
         <span><select data-m="${m}" aria-label="${esc(T[t].name)} ${MODE_NAME[m]}のシステム">${list.map(x=>`<option ${x===f?"selected":""}>${esc(x)}</option>`).join("")}</select><span class="saved">${note}</span></span>`};
-    el.innerHTML=`<div class="th"><span class="chip" style="background:${T[t].color}"></span>${logo(T[t].apiId)}${esc(T[t].name)}
+    el.innerHTML=`<div class="th"><span class="chip" style="background:${T[t].color}"></span>${logo(T[t].apiId)}${esc(tName(T[t].apiId,T[t].name))}
         <span class="mode ${cur}">${MODE_NAME[cur]}を表示中</span></div>
       <div class="fmrow">${MODES.map(row).join("")}</div>
       <div class="tbtns">
@@ -714,6 +723,45 @@ const LEAGUES=[[39,"プレミアリーグ"],[140,"ラ・リーガ"],[135,"セリ
 const LG_NAME=Object.fromEntries(LEAGUES);
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
+
+/* ---------- Japanese names: names.json in this repo maps API team / player ids to Japanese (no AI, no API request) ---------- */
+let NAMES=ls.get("tacboard.names",null)||{teams:{},players:{}};
+let JA=ls.get("tacboard.ja",true);
+const fold=s=>String(s||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase().replace(/[^a-z0-9]/g,"");
+/* a team entry is used only if its English key word matches the API name, so a wrong id can't show the wrong club */
+function teamJa(id,en){const e=id!=null&&NAMES.teams&&NAMES.teams[id];if(!e||!e[0])return null;if(!e[1]||!en)return e[0];
+  const a=fold(e[1]),b=fold(en);return a===b||(a.length>=3&&b.includes(a))||(b.length>=3&&a.includes(b))?e[0]:null}
+const plJa=p=>p&&p.apiId!=null&&NAMES.players&&NAMES.players[p.apiId]||null;
+const tName=(id,en)=>JA&&teamJa(id,en)||en;
+const pName=p=>{const e=JA&&plJa(p);return e&&e[0]||p.name};
+const pShort=p=>{const e=JA&&plJa(p);return e&&e[0]?(e[2]||e[0].split("・").pop()):p.name};
+async function loadNames(){try{const r=await fetch("names.json",{cache:"no-cache"});if(!r.ok)return;const j=await r.json();
+  if(!j||typeof j.teams!=="object"||typeof j.players!=="object"||JSON.stringify(j)===JSON.stringify(NAMES))return;
+  NAMES=j;ls.set("tacboard.names",j);refreshNames()}catch(e){}}
+function refreshNames(){render();renderRecent();renderTeams();if(lastFx)renderFixtures(lastFx);renderNameBox()}
+/* names still missing: teams seen in searches, and teams / players of saved matches and the open match */
+function noteTeams(list){const ask=ls.get("tacboard.nameAsk",{});let ch=false;
+  list.forEach(([t,lg])=>{if(t&&t.id!=null&&!teamJa(t.id,t.name)&&!ask[t.id]){ask[t.id]=[t.name,lg||""];ch=true}});
+  if(ch){const k=Object.keys(ask);k.slice(0,Math.max(0,k.length-300)).forEach(x=>delete ask[x]);ls.set("tacboard.nameAsk",ask)}}
+function missingNames(){
+  const teams=new Map(),players=new Map(),ask=ls.get("tacboard.nameAsk",{});
+  Object.keys(ask).forEach(id=>{if(teamJa(+id,ask[id][0]))delete ask[id]});ls.set("tacboard.nameAsk",ask);
+  const addT=(id,name,lg)=>{if(id==null||!name||teamJa(id,name)||teams.has(+id))return;teams.set(+id,{id:+id,name,lg:lg||""})};
+  Object.keys(ask).forEach(id=>addT(id,ask[id][0],ask[id][1]));
+  const datas=ls.get("tacboard.recent",[]).map(r=>[ls.get("tacboard.match."+r.id,null),r.lg]).filter(x=>x[0]);
+  if(S&&S.data)datas.push([S.data,""]);
+  datas.forEach(([d,lg])=>["home","away"].forEach(s=>{const T=d.teams&&d.teams[s];if(!T||T.apiId==null)return;addT(T.apiId,T.name,lg);
+    (T.players||[]).forEach(p=>{if(p.apiId==null||plJa(p)||players.has(p.apiId))return;players.set(p.apiId,{id:p.apiId,name:p.name,num:p.num,team:T.name,teamId:T.apiId})})}));
+  return {teams:[...teams.values()],players:[...players.values()]};
+}
+function missingText(){const m=missingNames();if(!m.teams.length&&!m.players.length)return "";
+  return [`観戦戦術ボード 日本語名の追加依頼 ${todayJST()}`,
+    `[teams] ID / 英語名 / 大会`,...m.teams.map(t=>[t.id,t.name,t.lg].join("\t")),
+    `[players] ID / 英語名 / 背番号 / チーム`,...m.players.map(p=>[p.id,p.name,p.num,`${p.team}(${p.teamId})`].join("\t"))].join("\n")}
+function renderNameBox(){const m=missingNames(),nt=Object.keys(NAMES.teams||{}).length,np=Object.keys(NAMES.players||{}).length;
+  $("nmJa").checked=JA;
+  $("nmInfo").textContent=`対応表: チーム ${nt} / 選手 ${np}${NAMES.updated?`(${NAMES.updated} 更新)`:""} ・ 未登録: チーム ${m.teams.length} / 選手 ${m.players.length}`;
+  $("nmCopy").disabled=$("nmShare").disabled=!(m.teams.length||m.players.length)}
 const todayJST=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
 function shiftDate(d,n){const x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
 let quota=null;
@@ -759,8 +807,9 @@ let lastFx=null;
 function renderFixtures(list){
   const sel=ls.get("tacboard.leagues",LEAGUES.map(l=>l[0])),all=ls.get("tacboard.allLeagues",false);
   const rows=list.filter(f=>all||sel.includes(f.league.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
+  noteTeams(rows.flatMap(f=>{const lg=LG_NAME[f.league.id]||f.league.name;return [[f.teams.home,lg],[f.teams.away,lg]]}));
   $("fList").innerHTML=rows.length?rows.map(f=>`<li><span class="ko">${esc(f.fixture.date.slice(11,16))}</span>
-      <span class="vs"><span class="lg">${esc(LG_NAME[f.league.id]||f.league.name)}</span>${star(f.teams.home)}${logo(f.teams.home.id)}${esc(f.teams.home.name)} vs ${star(f.teams.away)}${logo(f.teams.away.id)}${esc(f.teams.away.name)}</span>
+      <span class="vs"><span class="lg">${esc(LG_NAME[f.league.id]||f.league.name)}</span>${star(f.teams.home)}${logo(f.teams.home.id)}${esc(tName(f.teams.home.id,f.teams.home.name))} vs ${star(f.teams.away)}${logo(f.teams.away.id)}${esc(tName(f.teams.away.id,f.teams.away.name))}</span>
       <button class="ghost" data-fx="${f.fixture.id}">読み込む</button></li>`).join("")
     :`<li style="display:block" class="empty">該当する試合はありません。リーグの選択や日付を変えてみてください。</li>`;
 }
@@ -874,7 +923,7 @@ $("fList").addEventListener("click",e=>{
 function renderRecent(){
   const rec=ls.get("tacboard.recent",[]);$("fRecentBox").hidden=!rec.length;
   $("fRecent").innerHTML=rec.map(r=>`<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}</span>
-    <span class="vs"><span class="lg">${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${r.home&&r.away?`${star(r.home)}${logo(r.home.id)}${esc(r.home.name)} vs ${star(r.away)}${logo(r.away.id)}${esc(r.away.name)}`:esc(r.label)}</span>
+    <span class="vs"><span class="lg">${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${r.home&&r.away?`${star(r.home)}${logo(r.home.id)}${esc(tName(r.home.id,r.home.name))} vs ${star(r.away)}${logo(r.away.id)}${esc(tName(r.away.id,r.away.name))}`:esc(r.label)}</span>
     <span style="display:flex;gap:6px"><button class="ghost" data-open="${esc(r.id)}">開く</button><button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`).join("");
 }
 $("fRecent").addEventListener("click",e=>{
@@ -932,7 +981,7 @@ const myTeams=()=>ls.get("tacboard.teams",[]);
 function toggleTeam(id,name){let t=myTeams();t=t.some(x=>x.id===id)?t.filter(x=>x.id!==id):[...t,{id,name}];ls.set("tacboard.teams",t);
   renderTeams();renderRecent();if(lastFx)renderFixtures(lastFx);promptCheck()}
 function renderTeams(){const t=myTeams();
-  $("tmList").innerHTML=t.length?t.map(x=>`<span class="tmchip">${logo(x.id)}${esc(x.name)}<button class="del" data-unstar="${x.id}" aria-label="${esc(x.name)}の登録を外す">外す</button></span>`).join("")
+  $("tmList").innerHTML=t.length?t.map(x=>`<span class="tmchip">${logo(x.id)}${esc(tName(x.id,x.name))}<button class="del" data-unstar="${x.id}" aria-label="${esc(x.name)}の登録を外す">外す</button></span>`).join("")
     :`<span class="hint">試合一覧や読み込んだ試合のチーム名の横の ☆ を押すと登録できます</span>`;
   $("tmCheck").disabled=!t.length}
 $("tmList").addEventListener("click",e=>{const b=e.target.closest("[data-unstar]");if(b){const t=myTeams().find(x=>x.id===+b.dataset.unstar);if(t)toggleTeam(t.id,t.name)}});
@@ -966,7 +1015,19 @@ $("fKeySave").onclick=()=>{const v=$("fKey").value.trim();if(!v){fmsg("fKeyMsg",
 $("fUsage").onclick=checkUsage;
 $("fKeyDel").onclick=()=>{ls.del("tacboard.apikey");renderKey()};
 
-$("fDate").value=todayJST();dateRange();renderUsage();renderLeagues();renderRecent();renderKey();renderTeams();promptCheck();
+/* Japanese names: toggle, and hand the missing names to Claude (copy, or a text file via the share sheet) */
+$("nmJa").onchange=e=>{JA=e.target.checked;ls.set("tacboard.ja",JA);refreshNames()};
+$("nmCopy").onclick=async()=>{const t=missingText();if(!t)return;$("nmText").hidden=true;
+  try{await navigator.clipboard.writeText(t);fmsg("nmMsg","コピーしました。Claude のチャットに貼り付けてください")}
+  catch(e){$("nmText").value=t;$("nmText").hidden=false;$("nmText").focus();$("nmText").select();fmsg("nmMsg","自動でコピーできませんでした。下の欄を長押しして「すべてを選択」→「コピー」してください",true)}};
+$("nmShare").onclick=async()=>{const t=missingText();if(!t)return;const name=`tactics-board-names-${todayJST()}.txt`,file=new File([t],name,{type:"text/plain"});
+  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});fmsg("nmMsg","書き出しました");return}}
+  catch(e){if(e&&e.name==="AbortError"){fmsg("nmMsg","書き出しを取り消しました");return}}
+  const a=document.createElement("a");a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);fmsg("nmMsg","書き出しました(ダウンロード)")};
+$("finder").addEventListener("toggle",()=>{if($("finder").open)renderNameBox()});
+
+$("fDate").value=todayJST();dateRange();renderUsage();renderLeagues();renderRecent();renderKey();renderTeams();promptCheck();renderNameBox();loadNames();
 
 buildChips();renderEditor();render();
 })();
