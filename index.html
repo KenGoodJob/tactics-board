@@ -279,8 +279,8 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
         <h3 class="sub">名前の日本語表記</h3>
         <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="nmJa"> チーム名・選手名を日本語で表示する</label>
         <p class="hint" id="nmInfo"></p>
-        <div class="frow"><button class="ghost" id="nmCopy">未登録の名前をコピー</button><button class="ghost" id="nmShare">ファイルに書き出す</button></div>
-        <p class="hint">コピーした内容を Claude の戦術ボードアプリのプロジェクトのチャットに貼ると、対応表に追加します。追加後にこのアプリを開き直すと日本語で表示されます。対応表に無い名前は英語のままです。</p>
+        <div class="frow"><button class="ghost" id="nmCopy">未登録の名前をコピー</button><button class="ghost" id="nmShare">ファイルに書き出す</button><button class="ghost" id="nmReload">対応表を読み直す</button></div>
+        <p class="hint">コピーした内容を Claude の戦術ボードアプリのプロジェクトのチャットに貼ると、対応表に追加します。追加後に「対応表を読み直す」を押すと(またはアプリを開き直すと)日本語で表示されます。盤面や時間などの状態はそのままです。対応表に無い名前は英語のままです。</p>
         <div class="fmsg" id="nmMsg"></div>
         <textarea id="nmText" readonly hidden rows="6" style="width:100%;box-sizing:border-box;font-size:12px;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:6px 8px"></textarea>
       </div>
@@ -341,7 +341,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104021527">20261104021527</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104022839">20261104022839</span></p>
 </div>
 
 <script>
@@ -737,9 +737,10 @@ const tName=(id,en)=>JA&&teamJa(id,en)||en;
 const unent=s=>String(s??"").replace(/&(apos|#39|quot|lt|gt|amp);/g,(m,k)=>({apos:"'","#39":"'",quot:'"',lt:"<",gt:">",amp:"&"}[k]));
 const pName=p=>{const e=JA&&plJa(p);return e&&e[0]||unent(p.name)};
 const pShort=p=>{const e=JA&&plJa(p);return e&&e[0]?(e[2]||e[0].split("・").pop()):unent(p.name)};
-async function loadNames(){try{const r=await fetch("names.json",{cache:"no-cache"});if(!r.ok)return;const j=await r.json();
-  if(!j||typeof j.teams!=="object"||typeof j.players!=="object"||JSON.stringify(j)===JSON.stringify(NAMES))return;
-  NAMES=j;ls.set("tacboard.names",j);refreshNames()}catch(e){}}
+/* returns "new" | "same" | "fail"; only the names are redrawn, the board, time and applied events stay as they are */
+async function loadNames(){try{const r=await fetch("names.json",{cache:"no-cache"});if(!r.ok)return "fail";const j=await r.json();
+  if(!j||typeof j.teams!=="object"||typeof j.players!=="object")return "fail";if(JSON.stringify(j)===JSON.stringify(NAMES))return "same";
+  NAMES=j;ls.set("tacboard.names",j);refreshNames();return "new"}catch(e){return "fail"}}
 function refreshNames(){render();renderRecent();renderTeams();if(lastFx)renderFixtures(lastFx);renderNameBox()}
 /* names still missing: teams seen in searches, and teams / players of saved matches and the open match */
 function noteTeams(list){const ask=ls.get("tacboard.nameAsk",{});let ch=false;
@@ -1028,6 +1029,8 @@ $("nmShare").onclick=async()=>{const t=missingText();if(!t)return;const name=`ta
   const a=document.createElement("a");a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);fmsg("nmMsg","書き出しました(ダウンロード)")};
 $("finder").addEventListener("toggle",()=>{if($("finder").open)renderNameBox()});
+$("nmReload").onclick=async()=>{$("nmReload").disabled=true;fmsg("nmMsg","読み直しています…");const r=await loadNames();$("nmReload").disabled=false;
+  renderNameBox();fmsg("nmMsg",r==="new"?"新しい対応表を反映しました":r==="same"?"対応表は最新です(変更はありません)":"読み直せませんでした。通信状態を確認してください",r==="fail")};
 
 $("fDate").value=todayJST();dateRange();renderUsage();renderLeagues();renderRecent();renderKey();renderTeams();promptCheck();renderNameBox();loadNames();
 
