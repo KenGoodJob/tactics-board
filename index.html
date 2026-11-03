@@ -298,7 +298,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261103160917">20261103160917</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261103223411">20261103223411</span></p>
 </div>
 
 <script>
@@ -346,7 +346,6 @@ let S=null;
 /* board state lives only for this session: it survives an accidental reload, and is gone once the app or tab is closed */
 try{localStorage.removeItem(KEY)}catch(e){}
 try{S=JSON.parse(sessionStorage.getItem(KEY)||"null")}catch(e){S=null}
-if(!S||!S.data||!S.data.teams||!S.shapes||!S.shapes.home.nrm){S=fresh(clone(SAMPLE))}
 function kick(){return {seg:"1H",min:0,add:0}}
 const MODES=["nrm","atk","def"];
 function newShape(){return {fm:null,pos:null,work:{}}}
@@ -357,6 +356,17 @@ const modeOf=t=>S.poss==="none"?"nrm":S.poss===t?"atk":"def";
 const shapeOf=(t,m=modeOf(t))=>S.shapes[t][m];
 const fmOf=(t,m)=>shapeOf(t,m).fm||S.data.teams[t].formation;
 function save(){try{sessionStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+/* "saved" shapes (system + saved positions, and the left/right flip) are kept on this device per match.
+   Dragged-but-unsaved positions, time and applied events are NOT kept, so reopening a match spoils nothing. */
+function matchKey(d){return "tacboard.shape."+(d.fixture?"fx"+d.fixture:"t:"+d.teams.home.name+"|"+d.teams.away.name)}
+function keepShapes(){try{const o={flip:S.flip||{},shapes:{home:{},away:{}}};
+  ["home","away"].forEach(t=>MODES.forEach(m=>{const sh=S.shapes[t][m];if(sh.fm||sh.pos)o.shapes[t][m]={fm:sh.fm,pos:sh.pos}}));
+  const empty=!o.flip.home&&!o.flip.away&&!MODES.some(m=>o.shapes.home[m]||o.shapes.away[m]);
+  if(empty)localStorage.removeItem(matchKey(S.data));else localStorage.setItem(matchKey(S.data),JSON.stringify(o))}catch(e){}}
+function start(data){S=fresh(data);let o=null;try{o=JSON.parse(localStorage.getItem(matchKey(data))||"null")}catch(e){}
+  if(!o)return;["home","away"].forEach(t=>{if(o.flip&&o.flip[t])flipTeam(t);
+    MODES.forEach(m=>{const v=o.shapes&&o.shapes[t]&&o.shapes[t][m];if(v){S.shapes[t][m].fm=v.fm||null;S.shapes[t][m].pos=v.pos||null}})})}
+if(!S||!S.data||!S.data.teams||!S.shapes||!S.shapes.home.nrm){start(clone(SAMPLE))}
 /* ends: teams change ends for the 2nd half and 2nd half of extra time (like a broadcast); positions are stored as at kickoff */
 function endsFlipped(){const seg=norm(S.applied).seg;const second=seg==="2H"||seg==="ET2"||seg==="PK";return (S.autoEnds!==false&&second)!==!!S.endSwap}
 const endView=p=>endsFlipped()?{x:105-p.x,y:68-p.y}:p;
@@ -543,14 +553,14 @@ $("possSeg").addEventListener("click",e=>{const b=e.target.closest("[data-poss]"
 document.querySelector(".tctrls").addEventListener("change",e=>{
   const sel=e.target.closest("select[data-m]");if(!sel)return;const t=sel.closest(".tctrl").dataset.team,m=sel.dataset.m;
   const sh=shapeOf(t,m);sh.fm=sel.value===S.data.teams[t].formation?null:sel.value;sh.pos=null;sh.work={};
-  tmsg[t]=`${MODE_NAME[m]}のシステムを ${sel.value} にしました`;save();render()});
+  tmsg[t]=`${MODE_NAME[m]}のシステムを ${sel.value} にしました`;save();keepShapes();render()});
 document.querySelector(".tctrls").addEventListener("click",e=>{
   const b=e.target.closest("[data-act]");if(!b)return;const t=b.closest(".tctrl").dataset.team,m=modeOf(t),sh=shapeOf(t,m);
-  if(b.dataset.act==="flip"){flipTeam(t);tmsg[t]="スタメンの左右を反転しました(保存した配置はリセット)";save();render();renderEditor();return}
+  if(b.dataset.act==="flip"){flipTeam(t);tmsg[t]="スタメンの左右を反転しました(保存した配置はリセット)";save();keepShapes();render();renderEditor();return}
   if(b.dataset.act==="save"){sh.pos=Array.from({length:11},(_,s)=>({...slotPos(t,s,m)}));sh.work={};tmsg[t]=`${MODE_NAME[m]}の配置を保存しました`}
   if(b.dataset.act==="reset"){sh.work={};tmsg[t]=sh.pos||sh.fm?`保存した${MODE_NAME[m]}の配置に戻しました`:`${MODE_NAME[m]}は保存がないので、最初の配置に戻しました`}
   if(b.dataset.act==="init"){sh.fm=null;sh.pos=null;sh.work={};tmsg[t]=`${MODE_NAME[m]}を最初の状態(${S.data.teams[t].formation})に戻しました`}
-  save();render()});
+  save();keepShapes();render()});
 $("autoEnds").onchange=e=>{S.autoEnds=e.target.checked;save();render()};
 $("swapEnds").onclick=()=>{S.endSwap=!S.endSwap;save();render()};
 $("resetAll").onclick=()=>{["home","away"].forEach(t=>{MODES.forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});save();render()};
@@ -640,17 +650,18 @@ $("exportBtn").onclick=()=>{const s=JSON.stringify(S.data,null,1);$("json").valu
   try{navigator.clipboard.writeText(s).then(done,()=>{$("json").select();$("jsonMsg").textContent="選択しました。コピーしてください"})}catch(err){$("json").select()}};
 $("importBtn").onclick=()=>{try{const d=JSON.parse($("json").value);
   if(!d.teams||!d.teams.home||!d.teams.away||!Array.isArray(d.events))throw 0;
-  S=fresh(d);save();renderEditor();render();$("jsonMsg").textContent="読み込みました(時間はキックオフに戻りました)";
+  start(d);save();renderEditor();render();$("jsonMsg").textContent="読み込みました(時間はキックオフに戻りました)";
   }catch(err){$("jsonMsg").textContent="読み込めませんでした。書き出したときの形式のJSONを貼り付けてください"}};
-$("sampleBtn").onclick=()=>{S=fresh(clone(SAMPLE));save();renderEditor();render();$("jsonMsg").textContent="サンプル試合に戻しました"};
+$("sampleBtn").onclick=()=>{start(clone(SAMPLE));save();renderEditor();render();$("jsonMsg").textContent="サンプル試合に戻しました"};
 
 /* ---------- left/right flip for starters ---------- */
 function flipTeam(t){
   const T=S.data.teams[t],st=T.players.filter(p=>p.starter),bn=T.players.filter(p=>!p.starter);
   const out=[st[0]];let i=1;parseFm(T.formation).forEach(k=>{out.push(...st.slice(i,i+k).reverse());i+=k});out.push(...st.slice(i));
   T.players=[...out.filter(Boolean),...bn];MODES.forEach(m=>{S.shapes[t][m].pos=null;S.shapes[t][m].work={}});
+  S.flip=S.flip||{};S.flip[t]=!S.flip[t];
 }
-function loadMatch(data){S=fresh(data);save();renderEditor();render()}
+function loadMatch(data){start(data);save();renderEditor();render()}
 
 /* ---------- API-Football (key stays in this browser only) ---------- */
 const API="https://v3.football.api-sports.io/";
@@ -759,7 +770,7 @@ function convert(fx,lineups,events){
       out.push({...base,type:"sub",team:s,player:o,playerIn:i});
     }
   });
-  return {teams,events:out};
+  return {fixture:fx.fixture.id,teams,events:out};
 }
 async function loadFixture(fid){
   const cached=ls.get("tacboard.match."+fid,null);
@@ -790,7 +801,7 @@ function renderRecent(){
 $("fRecent").addEventListener("click",e=>{
   const o=e.target.closest("[data-open]"),d=e.target.closest("[data-forget]");
   if(o){const c=ls.get("tacboard.match."+o.dataset.open,null);if(c){loadMatch(c);fmsg("fMsg","保存済みのデータを開きました(通信なし)");closeFinder()}}
-  if(d){ls.del("tacboard.match."+d.dataset.forget);ls.set("tacboard.recent",ls.get("tacboard.recent",[]).filter(r=>String(r.id)!==d.dataset.forget));renderRecent()}
+  if(d){const c=ls.get("tacboard.match."+d.dataset.forget,null);if(c)ls.del(matchKey(c));ls.del("tacboard.match."+d.dataset.forget);ls.set("tacboard.recent",ls.get("tacboard.recent",[]).filter(r=>String(r.id)!==d.dataset.forget));renderRecent()}
 });
 
 /* key settings */

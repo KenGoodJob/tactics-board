@@ -29,7 +29,10 @@
 
 ### データの保持
 - 配置・時間・試合データは **sessionStorage のみ**(再読み込みでは残る、閉じたら消える)
-- localStorage に残すのは、APIキーと読み込み済み試合のキャッシュ(リクエスト節約のため)だけ
+- localStorage に残すのは、APIキー・リーグの絞り込み・読み込み済み試合のキャッシュ(リクエスト節約のため)と、試合ごとの「保存した配置」だけ
+  - 「保存した配置」= `tacboard.shape.<試合キー>` に、チーム×パターンごとのシステム(fm)・保存位置(pos)と「左右を反転」の状態を保存。試合キーは API の試合なら `fx<fixture id>`、それ以外はホーム名|アウェイ名
+  - 保存していないドラッグ位置・時間・反映済みの出来事は残さない(開き直してもネタバレしないため)
+  - 端末ごとの保存なので、iPad と iPhone では共有されない
 
 ### 試合データ(API-Football)
 - `https://v3.football.api-sports.io/`、ヘッダー `x-apisports-key`。無料プランは1日100リクエスト
@@ -41,7 +44,7 @@
 
 ### データ形式(書き出し・読み込み用 JSON)
 ```
-{ teams: { home|away: { name, color, formation, players: [{id, num, name, starter}] } },
+{ fixture(APIの試合のみ), teams: { home|away: { name, color, formation, players: [{id, num, name, starter}] } },
   events: [{ id, type: goal|og|sub|yellow|red|pso_goal|pso_miss, team, period: 1H|2H|ET1|ET2|PK,
              min, add, player, playerIn(subのみ) }] }
 ```
