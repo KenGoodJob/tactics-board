@@ -43,6 +43,12 @@ button{cursor:pointer}
 .team{display:flex;align-items:center;gap:10px;min-width:0}
 .team.away{justify-content:flex-end;text-align:right}
 .team .nm{font-weight:700;font-size:16px;overflow-wrap:anywhere;min-width:0}
+.logo{width:18px;height:18px;object-fit:contain;flex:none;vertical-align:-3px}
+.team .logo{width:30px;height:30px}
+.tl .hd .logo,.tctrl .th .logo{width:20px;height:20px}
+.fxlist .logo{width:16px;height:16px;margin-right:3px}
+.tmchip .logo{width:16px;height:16px;margin-right:-2px}
+.panel h2 .logo{width:18px;height:18px;margin-right:6px;vertical-align:-3px}
 .chip{width:14px;height:14px;border-radius:50%;flex:none;box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--line)}
 .mid{text-align:center}
 .goals{font-family:var(--f-display);font-weight:700;font-size:44px;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:.02em}
@@ -186,13 +192,13 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <span class="btns"><button class="update" id="tmGo" style="margin-left:0">確認する</button><button class="ghost" id="tmLater">あとで</button></span>
   </div>
   <section class="score" aria-label="スコア">
-    <div class="team home"><span class="chip" id="chipH"></span><span class="nm" id="nameH"></span></div>
+    <div class="team home"><span class="chip" id="chipH"></span><img class="logo" id="logoH" alt="" hidden><span class="nm" id="nameH"></span></div>
     <div class="mid">
       <div class="goals" id="goals">0 – 0</div>
       <div class="pk" id="pkScore" hidden></div>
       <div class="clock" id="appliedClock">キックオフ</div>
     </div>
-    <div class="team away"><span class="nm" id="nameA"></span><span class="chip" id="chipA"></span></div>
+    <div class="team away"><span class="nm" id="nameA"></span><img class="logo" id="logoA" alt="" hidden><span class="chip" id="chipA"></span></div>
   </section>
 
   <section class="timebar" aria-label="試合時間">
@@ -326,7 +332,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261103234937">20261103234937</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104000231">20261104000231</span></p>
 </div>
 
 <script>
@@ -400,6 +406,11 @@ function endsFlipped(){const seg=norm(S.applied).seg;const second=seg==="2H"||se
 const endView=p=>endsFlipped()?{x:105-p.x,y:68-p.y}:p;
 
 const $=id=>document.getElementById(id);
+/* team logos: API-Football image URL built from the team id (no API request). Hidden if it can't load (offline etc.) */
+const logoUrl=id=>id?`https://media.api-sports.io/football/teams/${encodeURIComponent(id)}.png`:"";
+const logo=id=>id?`<img class="logo" src="${logoUrl(id)}" alt="" loading="lazy">`:"";
+document.addEventListener("error",e=>{const t=e.target;if(t&&t.classList&&t.classList.contains("logo"))t.hidden=true},true);
+function setLogo(el,id){const u=logoUrl(id);if(!u){el.hidden=true;el.removeAttribute("src");return}if(el.getAttribute("src")!==u){el.hidden=false;el.src=u}}
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
 /* ---------- match clock (no bar: total length is never shown) ---------- */
@@ -488,6 +499,7 @@ function render(){
   const st=compute(S.applied),pm=pmap(),T=S.data.teams;
   $("nameH").textContent=T.home.name;$("nameA").textContent=T.away.name;
   $("chipH").style.background=T.home.color;$("chipA").style.background=T.away.color;
+  setLogo($("logoH"),T.home.apiId);setLogo($("logoA"),T.away.apiId);
   $("goals").textContent=st.score.home+" – "+st.score.away;
   $("pkScore").hidden=!st.pkUsed;$("pkScore").textContent="PK "+st.pk.home+" – "+st.pk.away;
   const ap=norm(S.applied);$("appliedClock").textContent=(ap.seg==="1H"&&ap.min===0)?"キックオフ":ap.seg==="PK"?"PK戦":tSeg(ap)+" "+tLabel(ap);
@@ -512,7 +524,7 @@ function render(){
   // benches / squads
   ["home","away"].forEach(t=>{
     const on=new Set(st.slots[t]);
-    $(t==="home"?"benchHTitle":"benchATitle").textContent=T[t].name;
+    $(t==="home"?"benchHTitle":"benchATitle").innerHTML=logo(T[t].apiId)+esc(T[t].name);
     $(t==="home"?"benchH":"benchA").innerHTML=players(t).map(p=>{
       const tags=(st.tags[p.id]||[]).map(x=>`<span class="tag ${x.cls}">${esc(x.txt)}</span>`).join(" ");
       const gone=!on.has(p.id);
@@ -528,8 +540,8 @@ function render(){
     const rows=[];st.log.forEach(e=>{const k=evOrd(e);let r=rows[rows.length-1];
       if(!r||r.k!==k){r={k,label:evLabel(e),home:[],away:[]};rows.push(r)}r[e.team].push(e)});
     $("log").innerHTML=`<div class="tl">
-      <div class="hd h">${esc(T.home.name)}<span class="chip" style="background:${T.home.color}"></span></div><div class="tm hd"></div>
-      <div class="hd"><span class="chip" style="background:${T.away.color}"></span>${esc(T.away.name)}</div>
+      <div class="hd h">${esc(T.home.name)}${logo(T.home.apiId)}<span class="chip" style="background:${T.home.color}"></span></div><div class="tm hd"></div>
+      <div class="hd"><span class="chip" style="background:${T.away.color}"></span>${logo(T.away.apiId)}${esc(T.away.name)}</div>
       ${rows.map(r=>`<div class="c h">${r.home.map(evHtml).join("")}</div><div class="tm">${esc(r.label)}</div><div class="c">${r.away.map(evHtml).join("")}</div>`).join("")}
     </div>`;
   }
@@ -547,8 +559,8 @@ function renderTime(){
 const tmsg={home:"",away:""};
 function renderFmSelects(){
   const T=S.data.teams;
-  $("possH").innerHTML=`<span class="chip" style="background:${T.home.color}"></span>${esc(T.home.name)} 保持`;
-  $("possA").innerHTML=`<span class="chip" style="background:${T.away.color}"></span>${esc(T.away.name)} 保持`;
+  $("possH").innerHTML=`<span class="chip" style="background:${T.home.color}"></span>${logo(T.home.apiId)}${esc(T.home.name)} 保持`;
+  $("possA").innerHTML=`<span class="chip" style="background:${T.away.color}"></span>${logo(T.away.apiId)}${esc(T.away.name)} 保持`;
   $("autoEnds").checked=S.autoEnds!==false;$("swapEnds").classList.toggle("on",!!S.endSwap);$("swapEnds").setAttribute("aria-pressed",!!S.endSwap);
   [["possN","none"],["possH","home"],["possA","away"]].forEach(([id,v])=>{$(id).classList.toggle("on",S.poss===v);$(id).setAttribute("aria-pressed",S.poss===v)});
   document.querySelectorAll(".tctrl").forEach(el=>{
@@ -557,7 +569,7 @@ function renderFmSelects(){
       const note=sh.pos?"配置を保存済み":(sh.fm?"システム変更済み":"");
       return `<span class="lbl ${m===cur?"cur":""}">${MODE_NAME[m]}</span>
         <span><select data-m="${m}" aria-label="${esc(T[t].name)} ${MODE_NAME[m]}のシステム">${list.map(x=>`<option ${x===f?"selected":""}>${esc(x)}</option>`).join("")}</select><span class="saved">${note}</span></span>`};
-    el.innerHTML=`<div class="th"><span class="chip" style="background:${T[t].color}"></span>${esc(T[t].name)}
+    el.innerHTML=`<div class="th"><span class="chip" style="background:${T[t].color}"></span>${logo(T[t].apiId)}${esc(T[t].name)}
         <span class="mode ${cur}">${MODE_NAME[cur]}を表示中</span></div>
       <div class="fmrow">${MODES.map(row).join("")}</div>
       <div class="tbtns">
@@ -743,7 +755,7 @@ function renderFixtures(list){
   const sel=ls.get("tacboard.leagues",LEAGUES.map(l=>l[0])),all=ls.get("tacboard.allLeagues",false);
   const rows=list.filter(f=>all||sel.includes(f.league.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
   $("fList").innerHTML=rows.length?rows.map(f=>`<li><span class="ko">${esc(f.fixture.date.slice(11,16))}</span>
-      <span class="vs"><span class="lg">${esc(LG_NAME[f.league.id]||f.league.name)}</span>${star(f.teams.home)}${esc(f.teams.home.name)} vs ${star(f.teams.away)}${esc(f.teams.away.name)}</span>
+      <span class="vs"><span class="lg">${esc(LG_NAME[f.league.id]||f.league.name)}</span>${star(f.teams.home)}${logo(f.teams.home.id)}${esc(f.teams.home.name)} vs ${star(f.teams.away)}${logo(f.teams.away.id)}${esc(f.teams.away.name)}</span>
       <button class="ghost" data-fx="${f.fixture.id}">読み込む</button></li>`).join("")
     :`<li style="display:block" class="empty">該当する試合はありません。リーグの選択や日付を変えてみてください。</li>`;
 }
@@ -857,7 +869,7 @@ $("fList").addEventListener("click",e=>{
 function renderRecent(){
   const rec=ls.get("tacboard.recent",[]);$("fRecentBox").hidden=!rec.length;
   $("fRecent").innerHTML=rec.map(r=>`<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}</span>
-    <span class="vs"><span class="lg">${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${r.home&&r.away?`${star(r.home)}${esc(r.home.name)} vs ${star(r.away)}${esc(r.away.name)}`:esc(r.label)}</span>
+    <span class="vs"><span class="lg">${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${r.home&&r.away?`${star(r.home)}${logo(r.home.id)}${esc(r.home.name)} vs ${star(r.away)}${logo(r.away.id)}${esc(r.away.name)}`:esc(r.label)}</span>
     <span style="display:flex;gap:6px"><button class="ghost" data-open="${esc(r.id)}">開く</button><button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`).join("");
 }
 $("fRecent").addEventListener("click",e=>{
@@ -915,7 +927,7 @@ const myTeams=()=>ls.get("tacboard.teams",[]);
 function toggleTeam(id,name){let t=myTeams();t=t.some(x=>x.id===id)?t.filter(x=>x.id!==id):[...t,{id,name}];ls.set("tacboard.teams",t);
   renderTeams();renderRecent();if(lastFx)renderFixtures(lastFx);promptCheck()}
 function renderTeams(){const t=myTeams();
-  $("tmList").innerHTML=t.length?t.map(x=>`<span class="tmchip">${esc(x.name)}<button class="del" data-unstar="${x.id}" aria-label="${esc(x.name)}の登録を外す">外す</button></span>`).join("")
+  $("tmList").innerHTML=t.length?t.map(x=>`<span class="tmchip">${logo(x.id)}${esc(x.name)}<button class="del" data-unstar="${x.id}" aria-label="${esc(x.name)}の登録を外す">外す</button></span>`).join("")
     :`<span class="hint">試合一覧や読み込んだ試合のチーム名の横の ☆ を押すと登録できます</span>`;
   $("tmCheck").disabled=!t.length}
 $("tmList").addEventListener("click",e=>{const b=e.target.closest("[data-unstar]");if(b){const t=myTeams().find(x=>x.id===+b.dataset.unstar);if(t)toggleTeam(t.id,t.name)}});
