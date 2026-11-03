@@ -150,6 +150,10 @@ h3.sub{margin:4px 0 0;font-size:13px;color:var(--muted);font-weight:500}
 .tag.in{color:var(--accent);border-color:currentColor}
 .tag.out{opacity:.8}
 .tag.red{color:var(--danger);border-color:currentColor}
+.tag.yc{background:#e8c22a;border-color:#c9a414;color:#111}
+.tag.goal{color:#1e6a47;border-color:currentColor}
+.tag.cum{border-style:dashed}
+.tag.cum.warn{color:#b8901a;border-color:currentColor;font-weight:700}
 .plist li.gone{color:var(--muted)}
 .log{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:4px;font-size:14px}
 .log li{display:grid;grid-template-columns:3.6em auto 1fr;gap:8px;align-items:baseline}
@@ -235,6 +239,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <span class="ends">
       <label><input type="checkbox" id="autoEnds"> 後半でエンドを交代</label>
       <button class="ghost" id="swapEnds">エンドを入れ替え</button>
+      <label><input type="checkbox" id="showMarks"> 盤面にカード・得点</label>
     </span>
     <button class="ghost" id="resetAll">両チームとも保存した配置に戻す</button>
   </div>
@@ -323,7 +328,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
           <label class="field" id="evMinF">分<input type="number" id="evMin" min="0" max="130" value="1"></label>
           <label class="field" id="evAddF">+AT<input type="number" id="evAdd" min="0" max="30" value="0"></label>
           <label class="field"><span id="evPlayerLbl">選手</span><select id="evPlayer"></select></label>
-          <label class="field" id="evInF">IN<select id="evIn"></select></label>
+          <label class="field" id="evInF"><span id="evInLbl">IN</span><select id="evIn"></select></label>
           <button class="ghost" id="evAddBtn">追加</button>
         </div>
         <div class="tblwrap"><table class="evtable"><tbody id="evRows"></tbody></table></div>
@@ -341,7 +346,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104031301">20261104031301</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104033612">20261104033612</span></p>
 </div>
 
 <script>
@@ -372,7 +377,7 @@ const SAMPLE={
       [1,"カンポ"],[14,"アランダ"],[15,"デルガド"],[16,"ソト"],[18,"ナバロ"],[19,"ブエノ"],[22,"レジェス"]])}
   },
   events:[
-    {id:"e1",type:"goal",team:"home",period:"1H",min:23,add:0,player:"home-9"},
+    {id:"e1",type:"goal",team:"home",period:"1H",min:23,add:0,player:"home-9",assist:"home-10"},
     {id:"e2",type:"yellow",team:"away",period:"1H",min:38,add:0,player:"away-6"},
     {id:"e3",type:"sub",team:"away",period:"2H",min:72,add:0,player:"away-11",playerIn:"away-18"},
     {id:"e4",type:"sub",team:"home",period:"2H",min:72,add:0,player:"home-7",playerIn:"home-17"},
@@ -380,7 +385,7 @@ const SAMPLE={
     {id:"e6",type:"sub",team:"home",period:"2H",min:83,add:0,player:"home-9",playerIn:"home-14"},
     {id:"e7",type:"goal",team:"away",period:"2H",min:90,add:3,player:"away-9"},
     {id:"e8",type:"sub",team:"away",period:"ET1",min:96,add:0,player:"away-10",playerIn:"away-15"},
-    {id:"e9",type:"goal",team:"away",period:"ET2",min:112,add:0,player:"away-15"}
+    {id:"e9",type:"goal",team:"away",period:"ET2",min:112,add:0,player:"away-15",assist:"away-9"}
   ]
 };
 const clone=o=>JSON.parse(JSON.stringify(o));
@@ -459,16 +464,18 @@ function buildChips(){$("segChips").innerHTML=SEGS.map(s=>`<button class="segbtn
 function players(t){return S.data.teams[t].players}
 function pmap(){const m={};["home","away"].forEach(t=>players(t).forEach(p=>m[p.id]=p));return m}
 function compute(t){const idx=ord(t);
-  const st={slots:{},score:{home:0,away:0},pk:{home:0,away:0},pkUsed:false,log:[],tags:{}};
+  const st={slots:{},score:{home:0,away:0},pk:{home:0,away:0},pkUsed:false,log:[],tags:{},marks:{}};
   ["home","away"].forEach(t=>{st.slots[t]=players(t).filter(p=>p.starter).slice(0,11).map(p=>p.id);while(st.slots[t].length<11)st.slots[t].push(null)});
   const evs=S.data.events.map((e,o)=>({e,o,i:evOrd(e)})).filter(x=>x.i<=idx).sort((a,b)=>a.i-b.i||a.o-b.o);
-  const tag=(id,cls,txt)=>{(st.tags[id]=st.tags[id]||[]).push({cls,txt})};
+  const tag=(id,cls,txt)=>{if(id)(st.tags[id]=st.tags[id]||[]).push({cls,txt})};
+  const mk=id=>id?(st.marks[id]=st.marks[id]||{g:0,a:0,y:0}):{g:0,a:0,y:0};
   evs.forEach(({e})=>{
     const sl=st.slots[e.team]||[];const lab=evLabel(e);
     if(e.type==="sub"){const k=sl.indexOf(e.player);if(k>=0&&e.playerIn)sl[k]=e.playerIn;tag(e.player,"out","OUT "+lab);tag(e.playerIn,"in","IN "+lab)}
     else if(e.type==="red"){const k=sl.indexOf(e.player);if(k>=0)sl[k]=null;tag(e.player,"red","退場 "+lab)}
-    else if(e.type==="goal")st.score[e.team]++;
-    else if(e.type==="og")st.score[e.team==="home"?"away":"home"]++;
+    else if(e.type==="yellow"){mk(e.player).y++;tag(e.player,"yc","警告 "+lab)}
+    else if(e.type==="goal"){st.score[e.team]++;mk(e.player).g++;tag(e.player,"goal","得点 "+lab);if(e.assist){mk(e.assist).a++;tag(e.assist,"goal","アシスト "+lab)}}
+    else if(e.type==="og"){st.score[e.team==="home"?"away":"home"]++;tag(e.player,"","OG "+lab)}
     else if(e.type==="pso_goal"){st.pk[e.team]++;st.pkUsed=true}
     else if(e.type==="pso_miss")st.pkUsed=true;
     st.log.push(e);
@@ -516,7 +523,7 @@ function render(){
   $("pkScore").hidden=!st.pkUsed;$("pkScore").textContent="PK "+st.pk.home+" – "+st.pk.away;
   const ap=norm(S.applied);$("appliedClock").textContent=(ap.seg==="1H"&&ap.min===0)?"キックオフ":ap.seg==="PK"?"PK戦":tSeg(ap)+" "+tLabel(ap);
   // board
-  let g="";
+  let g="";const showM=marksOn();
   ["home","away"].forEach(t=>{
     const col=T[t].color,fg=textOn(col);
     st.slots[t].forEach((pid,s)=>{
@@ -528,6 +535,7 @@ function render(){
         ${gk?`<circle r="2.95" fill="none" stroke="${col}" stroke-width=".45"/>`:""}
         <circle r="2.4" fill="${gk?"#e9e4d6":col}" stroke="rgba(0,0,0,.45)" stroke-width=".25"/>
         <text y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${gk?"#111":fg}">${esc(p.num)}</text>
+        ${showM?markSvg(st.marks[pid]):""}
         <text y="4.9" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(pShort(p))}</text>
       </g>`;
     });
@@ -547,7 +555,7 @@ function render(){
   if(!st.log.length){$("log").innerHTML=`<p class="empty">まだ反映された出来事はありません。</p>`}
   else{
     const n=id=>pm[id]?pShort(pm[id]):"?";
-    const evHtml=e=>{const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:n(e.player);
+    const evHtml=e=>{const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="goal"&&e.assist?`${n(e.player)}(A ${n(e.assist)})`:n(e.player);
       return `<div class="ev"><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span><span>${esc(txt)}</span></div>`};
     const rows=[];st.log.forEach(e=>{const k=evOrd(e);let r=rows[rows.length-1];
       if(!r||r.k!==k){r={k,label:evLabel(e),home:[],away:[]};rows.push(r)}r[e.team].push(e)});
@@ -559,6 +567,13 @@ function render(){
   }
   renderTime();renderFmSelects();
 }
+/* board marks: this match's yellow card (beside the disc) and goals/assists (above it), only up to the applied time */
+function marksOn(){try{return localStorage.getItem("tacboard.marks")!=="false"}catch(e){return true}}
+function markSvg(m){if(!m)return "";let o="";
+  if(m.y)o+=`<rect x="2.05" y="-3.3" width="1.2" height="1.65" rx=".2" fill="#f2cd2c" stroke="rgba(0,0,0,.55)" stroke-width=".18" transform="rotate(12 2.65 -2.5)"/>`;
+  const c=(sym,n)=>n?sym+(n>1?n:""):"";const txt=c("\u26BD",m.g)+c("\u{1F45F}",m.a);
+  if(txt)o+=`<text y="-3.05" text-anchor="middle" font-size="1.8" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="700" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".35" paint-order="stroke">${txt}</text>`;
+  return o}
 function renderTime(){
   const p=norm(S.pending),a=norm(S.applied),diff=ord(p)!==ord(a);
   $("pendLabel").textContent=tLabel(p);$("pendLabel").classList.toggle("diff",diff);
@@ -615,6 +630,7 @@ document.querySelector(".tctrls").addEventListener("click",e=>{
   save();keepShapes();render()});
 $("autoEnds").onchange=e=>{S.autoEnds=e.target.checked;save();render()};
 $("swapEnds").onclick=()=>{S.endSwap=!S.endSwap;save();render()};
+$("showMarks").checked=marksOn();$("showMarks").onchange=e=>{try{localStorage.setItem("tacboard.marks",String(e.target.checked))}catch(x){}render()};
 $("resetAll").onclick=()=>{["home","away"].forEach(t=>{MODES.forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});save();render()};
 
 /* ---------- drag ---------- */
@@ -671,8 +687,8 @@ function renderEditor(){
 function fillEvPlayers(){
   const t=$("evTeam").value,ty=$("evType").value;
   const opts=players(t).map(p=>`<option value="${esc(p.id)}">${esc(p.num)} ${esc(p.name)}</option>`).join("");
-  $("evPlayer").innerHTML=opts;$("evIn").innerHTML=players(t).filter(p=>!p.starter).map(p=>`<option value="${esc(p.id)}">${esc(p.num)} ${esc(p.name)}</option>`).join("")||opts;
-  $("evInF").hidden=ty!=="sub";$("evPlayerLbl").textContent=ty==="sub"?"OUT":"選手";
+  $("evPlayer").innerHTML=opts;$("evIn").innerHTML=ty==="goal"?`<option value="">なし</option>`+opts:players(t).filter(p=>!p.starter).map(p=>`<option value="${esc(p.id)}">${esc(p.num)} ${esc(p.name)}</option>`).join("")||opts;
+  $("evInF").hidden=ty!=="sub"&&ty!=="goal";$("evPlayerLbl").textContent=ty==="sub"?"OUT":"選手";$("evInLbl").textContent=ty==="goal"?"アシスト":"IN";
   const pso=ty.startsWith("pso");$("evPeriodF").hidden=pso;$("evMinF").hidden=pso;$("evAddF").hidden=pso;
 }
 $("evTeam").onchange=fillEvPlayers;$("evType").onchange=fillEvPlayers;
@@ -682,7 +698,7 @@ function renderEvRows(){
   const rows=S.data.events.map((e,o)=>({e,o,i:evOrd(e)})).sort((a,b)=>a.i-b.i||a.o-b.o);
   $("evRows").innerHTML=rows.length?rows.map(({e})=>{
     const n=id=>pm[id]?pm[id].num+" "+pm[id].name:"(不明)";
-    const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:n(e.player);
+    const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="goal"&&e.assist?`${n(e.player)}(アシスト ${n(e.assist)})`:n(e.player);
     return `<tr><td>${esc(evLabel(e))}</td><td><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span></td><td>${esc(T[e.team].name)}</td><td>${esc(txt)}</td><td style="text-align:right"><button class="del" data-del="${esc(e.id)}">削除</button></td></tr>`}).join("")
     :`<tr><td colspan="5" class="empty">出来事はまだありません。</td></tr>`;
 }
@@ -693,6 +709,7 @@ $("evAddBtn").onclick=()=>{
   const e={id:"e"+Date.now().toString(36),type:ty,team:$("evTeam").value,period:pso?"PK":$("evPeriod").value,
     min:pso?120:+$("evMin").value||0,add:pso?0:+$("evAdd").value||0,player:$("evPlayer").value};
   if(ty==="sub")e.playerIn=$("evIn").value;
+  if(ty==="goal"&&$("evIn").value&&$("evIn").value!==e.player)e.assist=$("evIn").value;
   if(!e.player)return;S.data.events.push(e);commit();
 };
 function commit(full=true){save();render();if(full){renderEvRows();fillEvPlayers()}}
@@ -871,7 +888,8 @@ function convert(fx,lineups,events){
     if(type==="goal"){
       if(det.includes("missed")){if(pso&&s)out.push({...base,type:"pso_miss",team:s,player:find(s,e.player)});return}
       if(det.includes("own")){const ps=whose(e.player)||s;if(ps)out.push({...base,type:"og",team:ps,player:find(ps,e.player)});return}
-      if(s)out.push({...base,type:pso?"pso_goal":"goal",team:s,player:find(s,e.player)});
+      if(s){const g={...base,type:pso?"pso_goal":"goal",team:s,player:find(s,e.player)};
+        const a=!pso&&e.assist&&(e.assist.id!=null||e.assist.name)?find(s,e.assist):null;if(a&&a!==g.player)g.assist=a;out.push(g)}
     }else if(type==="card"&&s&&!pso){
       out.push({...base,type:det.includes("yellow")&&!det.includes("second")?"yellow":"red",team:s,player:find(s,e.player)});
       if(!(det.includes("yellow")&&!det.includes("second")))on[s].delete(find(s,e.player));
