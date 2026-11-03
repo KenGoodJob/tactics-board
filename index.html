@@ -152,7 +152,12 @@ h3.sub{margin:4px 0 0;font-size:13px;color:var(--muted);font-weight:500}
 .tag.in{color:var(--accent);border-color:currentColor}
 .tag.out{opacity:.8}
 .tag.red{color:var(--danger);border-color:currentColor}
-.tag.yc{background:#e8c22a;border-color:#c9a414;color:#111}
+.tag.yc{color:#9a7810;border-color:currentColor}
+.cd{display:inline-block;width:7px;height:10px;border-radius:1.5px;vertical-align:-1px;margin-right:3px;box-shadow:0 0 0 .5px rgba(0,0,0,.35)}
+.cd.y{background:#f2cd2c}.cd.r{background:#d8352a}
+.cd.y+.cd.y{margin-left:-5px}
+.reds{display:inline-flex;gap:3px;flex:none}.reds .cd{width:10px;height:14px;margin:0}
+.tl button.tm{border:0;padding:0;font:inherit;color:var(--accent);text-decoration:underline dotted;text-underline-offset:3px;cursor:pointer;touch-action:manipulation}
 .tag.goal{color:#1e6a47;border-color:currentColor}
 .tag.cum{border-style:dashed}
 .tag.cum.warn{color:#b8901a;border-color:currentColor;font-weight:700}
@@ -198,13 +203,13 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <span class="btns"><button class="update" id="tmGo" style="margin-left:0">確認する</button><button class="ghost" id="tmLater">あとで</button></span>
   </div>
   <section class="score" aria-label="スコア">
-    <div class="team home"><span class="chip" id="chipH"></span><img class="logo" id="logoH" alt="" hidden><span class="nm" id="nameH"></span></div>
+    <div class="team home"><span class="chip" id="chipH"></span><img class="logo" id="logoH" alt="" hidden><span class="nm" id="nameH"></span><span class="reds" id="redsH"></span></div>
     <div class="mid">
       <div class="goals" id="goals">0 – 0</div>
       <div class="pk" id="pkScore" hidden></div>
       <div class="clock" id="appliedClock">キックオフ</div>
     </div>
-    <div class="team away"><span class="nm" id="nameA"></span><img class="logo" id="logoA" alt="" hidden><span class="chip" id="chipA"></span></div>
+    <div class="team away"><span class="reds" id="redsA"></span><span class="nm" id="nameA"></span><img class="logo" id="logoA" alt="" hidden><span class="chip" id="chipA"></span></div>
   </section>
 
   <section class="timebar" aria-label="試合時間">
@@ -229,7 +234,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <div class="status" id="status"></div>
   </section>
 
-  <div class="boardbox"><svg id="board" viewBox="-4 -4 113 76" aria-label="戦術ボード"></svg></div>
+  <div class="boardbox"><svg id="board" viewBox="-4 -6 113 94" aria-label="戦術ボード"></svg></div>
 
   <div class="possbar">
     <span class="plabel">配置パターン</span>
@@ -349,7 +354,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104061841">20261104061841</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104064157">20261104064157</span></p>
 </div>
 
 <script>
@@ -476,17 +481,21 @@ function buildChips(){$("segChips").innerHTML=SEGS.map(s=>`<button class="segbtn
 /* ---------- state at time ---------- */
 function players(t){return S.data.teams[t].players}
 function pmap(){const m={};["home","away"].forEach(t=>players(t).forEach(p=>m[p.id]=p));return m}
+const CARD_Y=`<i class="cd y"></i>`,CARD_R=`<i class="cd r"></i>`;
 function compute(t){const idx=ord(t);
-  const st={slots:{},score:{home:0,away:0},pk:{home:0,away:0},pkUsed:false,log:[],tags:{},marks:{}};
+  const st={slots:{},score:{home:0,away:0},pk:{home:0,away:0},pkUsed:false,log:[],tags:{},marks:{},reds:{home:[],away:[]},y2:new Set()};
   ["home","away"].forEach(t=>{st.slots[t]=players(t).filter(p=>p.starter).slice(0,11).map(p=>p.id);while(st.slots[t].length<11)st.slots[t].push(null)});
   const evs=S.data.events.map((e,o)=>({e,o,i:evOrd(e)})).filter(x=>x.i<=idx).sort((a,b)=>a.i-b.i||a.o-b.o);
-  const tag=(id,cls,txt)=>{if(id)(st.tags[id]=st.tags[id]||[]).push({cls,txt})};
-  const mk=id=>id?(st.marks[id]=st.marks[id]||{g:0,a:0,y:0}):{g:0,a:0,y:0};
+  const tag=(id,cls,txt,pre)=>{if(id)(st.tags[id]=st.tags[id]||[]).push({cls,txt,pre})};
+  const mk=id=>id?(st.marks[id]=st.marks[id]||{g:0,a:0,y:0,r:0}):{g:0,a:0,y:0,r:0};
   evs.forEach(({e})=>{
     const sl=st.slots[e.team]||[];const lab=evLabel(e);
     if(e.type==="sub"){const k=sl.indexOf(e.player);if(k>=0&&e.playerIn)sl[k]=e.playerIn;tag(e.player,"out","OUT "+lab);tag(e.playerIn,"in","IN "+lab)}
-    else if(e.type==="red"){const k=sl.indexOf(e.player);if(k>=0)sl[k]=null;tag(e.player,"red","退場 "+lab)}
-    else if(e.type==="yellow"){mk(e.player).y++;tag(e.player,"yc","警告 "+lab)}
+    else if(e.type==="red"){const k=sl.indexOf(e.player);if(k>=0)sl[k]=null;
+      /* a red after a yellow in the same match (or flagged by the API) is shown as a second yellow */
+      const m=mk(e.player),two=!!e.second||m.y>0;m.r=two?2:1;if(two)st.y2.add(e.id);
+      (st.reds[e.team]||[]).push(e.player);tag(e.player,"red","退場 "+lab,two?CARD_Y+CARD_Y:CARD_R)}
+    else if(e.type==="yellow"){mk(e.player).y++;tag(e.player,"yc","警告 "+lab,CARD_Y)}
     else if(e.type==="goal"){st.score[e.team]++;mk(e.player).g++;tag(e.player,"goal","得点 "+lab);if(e.assist){mk(e.assist).a++;tag(e.assist,"goal","アシスト "+lab)}}
     else if(e.type==="og"){st.score[e.team==="home"?"away":"home"]++;tag(e.player,"","OG "+lab)}
     else if(e.type==="pso_goal"){st.pk[e.team]++;st.pkUsed=true}
@@ -516,7 +525,7 @@ function slotPos(team,s,m=modeOf(team)){
 /* ---------- render ---------- */
 const PITCH=`
 <defs><clipPath id="fc"><circle r="2.3"/></clipPath></defs>
-<rect x="-4" y="-4" width="113" height="76" fill="var(--board)"/>
+<rect x="-4" y="-6" width="113" height="80" fill="var(--board)"/>
 <g fill="none" stroke="var(--chalk)" stroke-width=".32">
 <rect x="0" y="0" width="105" height="68"/><line x1="52.5" y1="0" x2="52.5" y2="68"/>
 <circle cx="52.5" cy="34" r="9.15"/>
@@ -534,34 +543,39 @@ function render(){
   $("chipH").style.background=T.home.color;$("chipA").style.background=T.away.color;
   setLogo($("logoH"),T.home.apiId);setLogo($("logoA"),T.away.apiId);
   $("goals").textContent=st.score.home+" – "+st.score.away;
+  $("redsH").innerHTML=CARD_R.repeat(st.reds.home.length);$("redsA").innerHTML=CARD_R.repeat(st.reds.away.length);
+  $("redsH").title=$("redsA").title="退場";
   $("pkScore").hidden=!st.pkUsed;$("pkScore").textContent="PK "+st.pk.home+" – "+st.pk.away;
   const ap=norm(S.applied);$("appliedClock").textContent=(ap.seg==="1H"&&ap.min===0)?"キックオフ":ap.seg==="PK"?"PK戦":tSeg(ap)+" "+tLabel(ap);
-  // board
-  let g="";const showM=marksOn(),showF=facesOn();
+  // board: pitch players, then the bench strip under the pitch (subs nearest the halfway line, players who left after them, faded)
+  let g="";const showM=marksOn(),showF=facesOn(),opt={showM,showF,marks:st.marks};
   ["home","away"].forEach(t=>{
-    const col=T[t].color,fg=textOn(col);
     st.slots[t].forEach((pid,s)=>{
       if(!pid)return;const p=pm[pid];if(!p)return;
       const o=endView(slotPos(t,s));
-      const gk=s===0,fu=showF&&faceUrl(p),face=!!fu&&!FACE_BAD.has(fu),bg=gk?"#e9e4d6":col,sh=pShort(p);
-      g+=`<g class="pl" data-team="${t}" data-slot="${s}" transform="translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})" style="cursor:grab">
-        <circle r="3.4" fill="transparent"/>
-        ${gk?`<circle r="2.95" fill="none" stroke="${col}" stroke-width=".45"/>`:""}
-        <circle class="pbg" r="2.4" fill="${face?"#dfe2dc":bg}" data-fill="${bg}" stroke="rgba(0,0,0,.45)" stroke-width=".25"/>
-        <text class="pnum"${face?` visibility="hidden"`:""} y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${gk?"#111":fg}">${esc(p.num)}</text>
-        ${face?`<image class="face" href="${esc(fu)}" x="-2.3" y="-2.3" width="4.6" height="4.6" clip-path="url(#fc)" preserveAspectRatio="xMidYMin slice" pointer-events="none"/><circle class="facering" r="2.4" fill="none" stroke="${col}" stroke-width=".55"/>`:""}
-        ${showM?markSvg(st.marks[pid]):""}
-        <text class="pname" data-plain="${esc(sh)}" y="4.9" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(face&&p.num!==""?p.num+" "+sh:sh)}</text>
-      </g>`;
+      g+=tokenSvg(p,t,o,{...opt,gk:s===0,attr:`data-slot="${s}"`});
     });
   });
+  const rows=benchRows(),left=endsFlipped()?"away":"home";
+  g+=`<rect x="-4" y="${BENCH_TOP}" width="113" height="${benchBottom(rows)-BENCH_TOP+4}" fill="rgba(0,0,0,.2)"/>`;
+  ["home","away"].forEach(t=>{
+    const on=new Set(st.slots[t]),ps=players(t).filter(p=>!on.has(p.id));
+    const used=new Set(Object.keys(st.tags).filter(id=>st.tags[id].some(x=>x.cls==="out"||x.cls==="red")));
+    const list=[...ps.filter(p=>!used.has(p.id)),...ps.filter(p=>used.has(p.id))];
+    list.forEach((p,i)=>{const row=Math.floor(i/BENCH_CAP),k=i%BENCH_CAP;
+      const d=(BENCH_GAP+k*BENCH_STEP)*(t===left?-1:1);
+      const o=BENCH_POS[p.id]||{x:52.5+d,y:BENCH_Y0+row*BENCH_DY};
+      g+=tokenSvg(p,t,o,{...opt,bench:true,gone:used.has(p.id),tier:k%2,attr:`data-bench="${esc(p.id)}"`});
+    });
+  });
+  svg.setAttribute("viewBox",`-4 -6 113 ${benchBottom(rows)+10}`);
   $("board").innerHTML=PITCH+g;
   // benches / squads
   ["home","away"].forEach(t=>{
     const on=new Set(st.slots[t]);
     $(t==="home"?"benchHTitle":"benchATitle").innerHTML=logo(T[t].apiId)+esc(tName(T[t].apiId,T[t].name));
     $(t==="home"?"benchH":"benchA").innerHTML=players(t).map(p=>{
-      const tags=(st.tags[p.id]||[]).map(x=>`<span class="tag ${x.cls}">${esc(x.txt)}</span>`).join(" ");
+      const tags=(st.tags[p.id]||[]).map(x=>`<span class="tag ${x.cls}">${x.pre||""}${esc(x.txt)}</span>`).join(" ");
       const gone=!on.has(p.id);
       return `<li class="${gone?"gone":""}"><span class="num">${esc(p.num)}</span><span>${faceImg(p)}${esc(pName(p))}${p.starter?"":` <span class="tag">控え</span>`}</span><span>${tags}</span></li>`;
     }).join("");
@@ -570,23 +584,45 @@ function render(){
   if(!st.log.length){$("log").innerHTML=`<p class="empty">まだ反映された出来事はありません。</p>`}
   else{
     const n=id=>pm[id]?pShort(pm[id]):"?";
-    const evHtml=e=>{const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="goal"&&e.assist?`${n(e.player)}(A ${n(e.assist)})`:n(e.player);
-      return `<div class="ev"><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span><span>${esc(txt)}</span></div>`};
+    const evHtml=e=>{const cards=e.type==="yellow"?CARD_Y:e.type==="red"?(st.y2.has(e.id)?CARD_Y+CARD_Y:CARD_R):"";const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="goal"&&e.assist?`${n(e.player)}(A ${n(e.assist)})`:n(e.player);
+      return `<div class="ev"><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span><span>${cards}${esc(txt)}</span></div>`};
     const rows=[];st.log.forEach(e=>{const k=evOrd(e);let r=rows[rows.length-1];
-      if(!r||r.k!==k){r={k,label:evLabel(e),home:[],away:[]};rows.push(r)}r[e.team].push(e)});
+      if(!r||r.k!==k){const tt=norm(evTime(e));r={k,label:evLabel(e),t:[tt.seg,tt.min,tt.add].join("|"),home:[],away:[]};rows.push(r)}r[e.team].push(e)});
     $("log").innerHTML=`<div class="tl">
       <div class="hd h">${esc(tName(T.home.apiId,T.home.name))}${logo(T.home.apiId)}<span class="chip" style="background:${T.home.color}"></span></div><div class="tm hd"></div>
       <div class="hd"><span class="chip" style="background:${T.away.color}"></span>${logo(T.away.apiId)}${esc(tName(T.away.apiId,T.away.name))}</div>
-      ${rows.map(r=>`<div class="c h">${r.home.map(evHtml).join("")}</div><div class="tm">${esc(r.label)}</div><div class="c">${r.away.map(evHtml).join("")}</div>`).join("")}
+      ${rows.map(r=>`<div class="c h">${r.home.map(evHtml).join("")}</div><button class="tm" data-t="${esc(r.t)}" aria-label="${esc(r.label)}に移動">${esc(r.label)}</button><div class="c">${r.away.map(evHtml).join("")}</div>`).join("")}
     </div>`;
   }
   renderTime();renderFmSelects();
 }
 /* board marks: this match's yellow card (beside the disc) and goals/assists (above it), only up to the applied time */
 function faceImg(p){const u=faceUrl(p);return u&&!FACE_BAD.has(u)?`<img class="face" src="${esc(u)}" alt="" loading="lazy">`:""}
+/* one player disc (pitch or bench). Bench discs are smaller, never saved, and reset on 更新 */
+const BENCH_CAP=11,BENCH_STEP=4.6,BENCH_GAP=3,BENCH_TOP=73.5,BENCH_Y0=77.5,BENCH_DY=9,BENCH_SC=.85;
+let BENCH_POS={};
+/* row count depends only on the squad size (+2 spare), so a sending-off never changes the board height */
+function benchRows(){return Math.max(1,...["home","away"].map(t=>Math.ceil((Math.max(0,players(t).length-11)+2)/BENCH_CAP)))}
+function benchBottom(rows){return BENCH_Y0+(rows-1)*BENCH_DY+6.5}
+function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier}){
+  const col=S.data.teams[t].color,fg=textOn(col),fu=showF&&faceUrl(p),face=!!fu&&!FACE_BAD.has(fu),bg=gk?"#e9e4d6":col,sh=pShort(p),m=marks[p.id];
+  const sc=bench?BENCH_SC:1,ly=bench?(tier?7.1:4.7):4.9;
+  return `<g class="pl${gone?" gone":""}" data-team="${t}" ${attr} data-sc="${sc}" transform="translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})${sc!==1?` scale(${sc})`:""}" style="cursor:grab"${gone?` opacity=".45"`:""}>
+    <circle r="3.4" fill="transparent"/>
+    ${gk?`<circle r="2.95" fill="none" stroke="${col}" stroke-width=".45"/>`:""}
+    <circle class="pbg" r="2.4" fill="${face?"#dfe2dc":bg}" data-fill="${bg}" stroke="rgba(0,0,0,.45)" stroke-width=".25"/>
+    <text class="pnum"${face?` visibility="hidden"`:""} y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${gk?"#111":fg}">${esc(p.num)}</text>
+    ${face?`<image class="face" href="${esc(fu)}" x="-2.3" y="-2.3" width="4.6" height="4.6" clip-path="url(#fc)" preserveAspectRatio="xMidYMin slice" pointer-events="none"/><circle class="facering" r="2.4" fill="none" stroke="${col}" stroke-width=".55"/>`:""}
+    ${markSvg(m,showM)}
+    <text class="pname" data-plain="${esc(sh)}" y="${ly}" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(face&&p.num!==""?p.num+" "+sh:sh)}</text>
+  </g>`}
 function marksOn(){try{return localStorage.getItem("tacboard.marks")!=="false"}catch(e){return true}}
-function markSvg(m){if(!m)return "";let o="";
-  if(m.y)o+=`<rect x="2.05" y="-3.3" width="1.2" height="1.65" rx=".2" fill="#f2cd2c" stroke="rgba(0,0,0,.55)" stroke-width=".18" transform="rotate(12 2.65 -2.5)"/>`;
+function markSvg(m,all){if(!m)return "";let o="";
+  const card=(c,dx,rot)=>`<rect x="${2.05+dx}" y="-3.3" width="1.2" height="1.65" rx=".2" fill="${c}" stroke="rgba(0,0,0,.55)" stroke-width=".18" transform="rotate(${rot} ${2.65+dx} -2.5)"/>`;
+  if(m.r===2)o+=card("#f2cd2c",-.35,4)+card("#f2cd2c",.25,14)+card("#d8352a",.85,24);
+  else if(m.r===1)o+=card("#d8352a",0,12);
+  if(!all)return o;
+  if(m.y&&!m.r)o+=`<rect x="2.05" y="-3.3" width="1.2" height="1.65" rx=".2" fill="#f2cd2c" stroke="rgba(0,0,0,.55)" stroke-width=".18" transform="rotate(12 2.65 -2.5)"/>`;
   const c=(sym,n)=>n?sym+(n>1?n:""):"";const txt=c("\u26BD",m.g)+c("\u{1F45F}",m.a);
   if(txt)o+=`<text y="-3.05" text-anchor="middle" font-size="1.8" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="700" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".35" paint-order="stroke">${txt}</text>`;
   return o}
@@ -628,7 +664,10 @@ function renderFmSelects(){
 /* ---------- time controls ---------- */
 $("steps").addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;step(+b.dataset.step);renderTime();save()});
 $("segChips").addEventListener("click",e=>{const b=e.target.closest("[data-seg]");if(!b)return;jump(b.dataset.seg);renderTime();save()});
-$("updateBtn").onclick=()=>{S.applied=norm(S.pending);save();render()};
+$("updateBtn").onclick=()=>{S.applied=norm(S.pending);BENCH_POS={};save();render()};
+/* tapping a time in 反映済みの出来事 moves the clock back there and applies it (already seen, so nothing new is revealed) */
+$("log").addEventListener("click",e=>{const b=e.target.closest("button.tm[data-t]");if(!b)return;
+  const [seg,min,add]=b.dataset.t.split("|");S.pending=S.applied=norm({seg,min:+min,add:+add});BENCH_POS={};save();render()});
 
 /* ---------- formation & reset ---------- */
 $("possSeg").addEventListener("click",e=>{const b=e.target.closest("[data-poss]");if(!b)return;
@@ -656,13 +695,15 @@ function svgPt(ev){const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY
 svg.addEventListener("pointerdown",ev=>{
   const g=ev.target.closest(".pl");if(!g)return;ev.preventDefault();
   const p=svgPt(ev);const m=/translate\(([-\d.]+) ([-\d.]+)\)/.exec(g.getAttribute("transform"));
-  drag={g,dx:+m[1]-p.x,dy:+m[2]-p.y,x:+m[1],y:+m[2]};g.classList.add("dragging");g.style.cursor="grabbing";
+  const sc=+g.dataset.sc||1;
+  drag={g,dx:+m[1]-p.x,dy:+m[2]-p.y,x:+m[1],y:+m[2],suf:sc!==1?` scale(${sc})`:"",ymax:benchBottom(benchRows())+2};g.classList.add("dragging");g.style.cursor="grabbing";
   svg.appendChild(g);try{svg.setPointerCapture(ev.pointerId)}catch(e){}
 });
 svg.addEventListener("pointermove",ev=>{if(!drag)return;const p=svgPt(ev);
-  drag.x=Math.max(-2,Math.min(107,p.x+drag.dx));drag.y=Math.max(-2,Math.min(70,p.y+drag.dy));
-  drag.g.setAttribute("transform",`translate(${drag.x.toFixed(2)} ${drag.y.toFixed(2)})`)});
-function endDrag(){if(!drag)return;const g=drag.g;shapeOf(g.dataset.team).work[g.dataset.slot]=endView({x:drag.x,y:drag.y});
+  drag.x=Math.max(-2,Math.min(107,p.x+drag.dx));drag.y=Math.max(-3,Math.min(drag.ymax,p.y+drag.dy));
+  drag.g.setAttribute("transform",`translate(${drag.x.toFixed(2)} ${drag.y.toFixed(2)})${drag.suf}`)});
+function endDrag(){if(!drag)return;const g=drag.g;
+  if(g.dataset.bench)BENCH_POS[g.dataset.bench]={x:drag.x,y:drag.y};else shapeOf(g.dataset.team).work[g.dataset.slot]=endView({x:drag.x,y:drag.y});
   g.classList.remove("dragging");g.style.cursor="grab";drag=null;save()}
 svg.addEventListener("pointerup",endDrag);svg.addEventListener("pointercancel",endDrag);
 
@@ -908,7 +949,8 @@ function convert(fx,lineups,events){
       if(s){const g={...base,type:pso?"pso_goal":"goal",team:s,player:find(s,e.player)};
         const a=!pso&&e.assist&&(e.assist.id!=null||e.assist.name)?find(s,e.assist):null;if(a&&a!==g.player)g.assist=a;out.push(g)}
     }else if(type==="card"&&s&&!pso){
-      out.push({...base,type:det.includes("yellow")&&!det.includes("second")?"yellow":"red",team:s,player:find(s,e.player)});
+      const yc=det.includes("yellow")&&!det.includes("second");
+      out.push({...base,type:yc?"yellow":"red",team:s,player:find(s,e.player),...(det.includes("second")?{second:true}:{})});
       if(!(det.includes("yellow")&&!det.includes("second")))on[s].delete(find(s,e.player));
     }else if(type==="subst"&&s){
       let o=find(s,e.player),i=find(s,e.assist);
