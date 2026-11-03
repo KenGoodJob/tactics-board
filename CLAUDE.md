@@ -46,11 +46,11 @@
 - 読み込み: `fixtures/lineups` と `fixtures/events`。終了済み(FT/AET/PEN)の試合だけ端末に保存して再利用
 - 対象リーグの初期値: プレミア(39)・ラ・リーガ(140)・セリエA(135)・ブンデス(78)・リーグ・アン(61)・CL(2)・EL(3)・ECL(848)
 - 試合中のシステム変更は API に無いので、ユーザーが手動で変更する
-- 登録チーム(半自動取得): 試合一覧のチーム名横の ☆ で登録(`tacboard.teams`)。起動時、登録チームがあり前回確認(`tacboard.teamCheck`)から3時間以上たっていれば上部に「確認しますか」を出し、**ユーザーが押したときだけ**前日・当日の一覧を取り、登録チームの終了済みで未保存の試合を保存する。結果は表示しない
+- 登録チーム(半自動取得): 試合一覧と「読み込んだ試合」のチーム名横の ☆ で登録(`tacboard.teams`)。一覧の項目は home/away の {id,name} を持つ(この機能より前に保存した項目には無く、☆ は出ない)。起動時、登録チームがあり前回確認(`tacboard.teamCheck`)から3時間以上たっていれば上部に「確認しますか」を出し、**ユーザーが押したときだけ**前日・当日の一覧を取り、登録チームの終了済みで未保存の試合を保存する。結果は表示しない
 
 ### データ形式(書き出し・読み込み用 JSON)
 ```
-{ fixture(APIの試合のみ), teams: { home|away: { name, color, formation, players: [{id, num, name, starter}] } },
+{ fixture(APIの試合のみ), teams: { home|away: { name, apiId(APIのみ), color, formation, players: [{id, num, name, starter}] } },
   events: [{ id, type: goal|og|sub|yellow|red|pso_goal|pso_miss, team, period: 1H|2H|ET1|ET2|PK,
              min, add, player, playerIn(subのみ) }] }
 ```
