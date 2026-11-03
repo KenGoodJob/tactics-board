@@ -354,7 +354,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104064157">20261104064157</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104065335">20261104065335</span></p>
 </div>
 
 <script>
@@ -681,13 +681,16 @@ document.querySelector(".tctrls").addEventListener("click",e=>{
   if(b.dataset.act==="flip"){flipTeam(t);tmsg[t]="スタメンの左右を反転しました(保存した配置はリセット)";save();keepShapes();render();renderEditor();return}
   if(b.dataset.act==="save"){sh.pos=Array.from({length:11},(_,s)=>({...slotPos(t,s,m)}));sh.work={};tmsg[t]=`${MODE_NAME[m]}の配置を保存しました`}
   if(b.dataset.act==="reset"){sh.work={};tmsg[t]=sh.pos||sh.fm?`保存した${MODE_NAME[m]}の配置に戻しました`:`${MODE_NAME[m]}は保存がないので、最初の配置に戻しました`}
+  if(b.dataset.act==="reset"||b.dataset.act==="init")resetBench(t);
   if(b.dataset.act==="init"){sh.fm=null;sh.pos=null;sh.work={};tmsg[t]=`${MODE_NAME[m]}を最初の状態(${S.data.teams[t].formation})に戻しました`}
   save();keepShapes();render()});
 $("autoEnds").onchange=e=>{S.autoEnds=e.target.checked;save();render()};
 $("swapEnds").onclick=()=>{S.endSwap=!S.endSwap;save();render()};
 $("showFaces").checked=facesOn();$("showFaces").onchange=e=>{try{localStorage.setItem("tacboard.faces",String(e.target.checked))}catch(x){}render()};
 $("showMarks").checked=marksOn();$("showMarks").onchange=e=>{try{localStorage.setItem("tacboard.marks",String(e.target.checked))}catch(x){}render()};
-$("resetAll").onclick=()=>{["home","away"].forEach(t=>{MODES.forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});save();render()};
+$("resetAll").onclick=()=>{["home","away"].forEach(t=>{MODES.forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});BENCH_POS={};save();render()};
+/* bench discs of one team go back to their default place */
+function resetBench(t){players(t).forEach(p=>delete BENCH_POS[p.id])}
 
 /* ---------- drag ---------- */
 const svg=$("board");let drag=null;
