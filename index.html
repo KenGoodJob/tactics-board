@@ -44,6 +44,8 @@ button{cursor:pointer}
 .team.away{justify-content:flex-end;text-align:right}
 .team .nm{font-weight:700;font-size:16px;overflow-wrap:anywhere;min-width:0}
 .logo{width:18px;height:18px;object-fit:contain;flex:none;vertical-align:-3px}
+img.face{width:24px;height:24px;border-radius:50%;object-fit:cover;object-position:top;vertical-align:-7px;margin-right:6px;background:var(--line)}
+.plist li.gone img.face{opacity:.55}
 .team .logo{width:30px;height:30px}
 .tl .hd .logo,.tctrl .th .logo{width:20px;height:20px}
 .fxlist .logo{width:16px;height:16px;margin-right:3px}
@@ -240,6 +242,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       <label><input type="checkbox" id="autoEnds"> 後半でエンドを交代</label>
       <button class="ghost" id="swapEnds">エンドを入れ替え</button>
       <label><input type="checkbox" id="showMarks"> 盤面にカード・得点</label>
+      <label><input type="checkbox" id="showFaces"> 盤面に顔写真</label>
     </span>
     <button class="ghost" id="resetAll">両チームとも保存した配置に戻す</button>
   </div>
@@ -346,7 +349,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104033612">20261104033612</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104061029">20261104061029</span></p>
 </div>
 
 <script>
@@ -426,7 +429,17 @@ const $=id=>document.getElementById(id);
 /* team logos: API-Football image URL built from the team id (no API request). Hidden if it can't load (offline etc.) */
 const logoUrl=id=>id?`https://media.api-sports.io/football/teams/${encodeURIComponent(id)}.png`:"";
 const logo=id=>id?`<img class="logo" src="${logoUrl(id)}" alt="" loading="lazy">`:"";
-document.addEventListener("error",e=>{const t=e.target;if(t&&t.classList&&t.classList.contains("logo"))t.hidden=true},true);
+document.addEventListener("error",e=>{const t=e.target;if(!t||!t.classList)return;if(t.classList.contains("logo"))t.hidden=true;
+  else if(t.classList.contains("face"))faceFail(t)},true);
+/* player photos: built from the API player id like the team logos (no API request); failures fall back to number / no photo */
+const faceUrl=p=>p&&p.apiId!=null?`https://media.api-sports.io/football/players/${encodeURIComponent(p.apiId)}.png`:"";
+const FACE_BAD=new Set();
+function faceFail(t){const u=t.getAttribute("href")||t.getAttribute("src");if(u)FACE_BAD.add(u);
+  const g=t.closest&&t.closest("g.pl");
+  if(g){g.querySelectorAll(".face,.facering").forEach(x=>x.remove());const n=g.querySelector(".pnum");if(n)n.removeAttribute("visibility");
+    const b=g.querySelector(".pbg");if(b)b.setAttribute("fill",b.dataset.fill);const l=g.querySelector(".pname");if(l)l.textContent=l.dataset.plain}
+  else t.hidden=true}
+function facesOn(){try{return localStorage.getItem("tacboard.faces")!=="false"}catch(e){return true}}
 function setLogo(el,id){const u=logoUrl(id);if(!u){el.hidden=true;el.removeAttribute("src");return}if(el.getAttribute("src")!==u){el.hidden=false;el.src=u}}
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 
@@ -502,6 +515,7 @@ function slotPos(team,s,m=modeOf(team)){
 
 /* ---------- render ---------- */
 const PITCH=`
+<defs><clipPath id="fc"><circle r="2.3"/></clipPath></defs>
 <rect x="-4" y="-4" width="113" height="76" fill="var(--board)"/>
 <g fill="none" stroke="var(--chalk)" stroke-width=".32">
 <rect x="0" y="0" width="105" height="68"/><line x1="52.5" y1="0" x2="52.5" y2="68"/>
@@ -523,20 +537,21 @@ function render(){
   $("pkScore").hidden=!st.pkUsed;$("pkScore").textContent="PK "+st.pk.home+" – "+st.pk.away;
   const ap=norm(S.applied);$("appliedClock").textContent=(ap.seg==="1H"&&ap.min===0)?"キックオフ":ap.seg==="PK"?"PK戦":tSeg(ap)+" "+tLabel(ap);
   // board
-  let g="";const showM=marksOn();
+  let g="";const showM=marksOn(),showF=facesOn();
   ["home","away"].forEach(t=>{
     const col=T[t].color,fg=textOn(col);
     st.slots[t].forEach((pid,s)=>{
       if(!pid)return;const p=pm[pid];if(!p)return;
       const o=endView(slotPos(t,s));
-      const gk=s===0;
+      const gk=s===0,fu=showF&&faceUrl(p),face=!!fu&&!FACE_BAD.has(fu),bg=gk?"#e9e4d6":col,sh=pShort(p);
       g+=`<g class="pl" data-team="${t}" data-slot="${s}" transform="translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})" style="cursor:grab">
         <circle r="3.4" fill="transparent"/>
         ${gk?`<circle r="2.95" fill="none" stroke="${col}" stroke-width=".45"/>`:""}
-        <circle r="2.4" fill="${gk?"#e9e4d6":col}" stroke="rgba(0,0,0,.45)" stroke-width=".25"/>
-        <text y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${gk?"#111":fg}">${esc(p.num)}</text>
+        <circle class="pbg" r="2.4" fill="${face?"#dfe2dc":bg}" data-fill="${bg}" stroke="rgba(0,0,0,.45)" stroke-width=".25"/>
+        <text class="pnum"${face?` visibility="hidden"`:""} y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${gk?"#111":fg}">${esc(p.num)}</text>
+        ${face?`<image class="face" href="${esc(fu)}" x="-2.3" y="-2.3" width="4.6" height="4.6" clip-path="url(#fc)" preserveAspectRatio="xMidYMin slice" pointer-events="none"/><circle class="facering" r="2.4" fill="none" stroke="${col}" stroke-width=".55"/>`:""}
         ${showM?markSvg(st.marks[pid]):""}
-        <text y="4.9" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(pShort(p))}</text>
+        <text class="pname" data-plain="${esc(sh)}" y="4.9" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(face&&p.num!==""?p.num+" "+sh:sh)}</text>
       </g>`;
     });
   });
@@ -548,7 +563,7 @@ function render(){
     $(t==="home"?"benchH":"benchA").innerHTML=players(t).map(p=>{
       const tags=(st.tags[p.id]||[]).map(x=>`<span class="tag ${x.cls}">${esc(x.txt)}</span>`).join(" ");
       const gone=!on.has(p.id);
-      return `<li class="${gone?"gone":""}"><span class="num">${esc(p.num)}</span><span>${esc(pName(p))}${p.starter?"":` <span class="tag">控え</span>`}</span><span>${tags}</span></li>`;
+      return `<li class="${gone?"gone":""}"><span class="num">${esc(p.num)}</span><span>${faceImg(p)}${esc(pName(p))}${p.starter?"":` <span class="tag">控え</span>`}</span><span>${tags}</span></li>`;
     }).join("");
   });
   // log: one row per moment, home left / away right
@@ -568,6 +583,7 @@ function render(){
   renderTime();renderFmSelects();
 }
 /* board marks: this match's yellow card (beside the disc) and goals/assists (above it), only up to the applied time */
+function faceImg(p){const u=faceUrl(p);return u&&!FACE_BAD.has(u)?`<img class="face" src="${esc(u)}" alt="" loading="lazy">`:""}
 function marksOn(){try{return localStorage.getItem("tacboard.marks")!=="false"}catch(e){return true}}
 function markSvg(m){if(!m)return "";let o="";
   if(m.y)o+=`<rect x="2.05" y="-3.3" width="1.2" height="1.65" rx=".2" fill="#f2cd2c" stroke="rgba(0,0,0,.55)" stroke-width=".18" transform="rotate(12 2.65 -2.5)"/>`;
@@ -630,6 +646,7 @@ document.querySelector(".tctrls").addEventListener("click",e=>{
   save();keepShapes();render()});
 $("autoEnds").onchange=e=>{S.autoEnds=e.target.checked;save();render()};
 $("swapEnds").onclick=()=>{S.endSwap=!S.endSwap;save();render()};
+$("showFaces").checked=facesOn();$("showFaces").onchange=e=>{try{localStorage.setItem("tacboard.faces",String(e.target.checked))}catch(x){}render()};
 $("showMarks").checked=marksOn();$("showMarks").onchange=e=>{try{localStorage.setItem("tacboard.marks",String(e.target.checked))}catch(x){}render()};
 $("resetAll").onclick=()=>{["home","away"].forEach(t=>{MODES.forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});save();render()};
 
