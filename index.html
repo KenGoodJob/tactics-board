@@ -341,7 +341,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104021514">20261104021514</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104021527">20261104021527</span></p>
 </div>
 
 <script>
@@ -733,8 +733,10 @@ function teamJa(id,en){const e=id!=null&&NAMES.teams&&NAMES.teams[id];if(!e||!e[
   const a=fold(e[1]),b=fold(en);return a===b||(a.length>=3&&b.includes(a))||(b.length>=3&&a.includes(b))?e[0]:null}
 const plJa=p=>p&&p.apiId!=null&&NAMES.players&&NAMES.players[p.apiId]||null;
 const tName=(id,en)=>JA&&teamJa(id,en)||en;
-const pName=p=>{const e=JA&&plJa(p);return e&&e[0]||p.name};
-const pShort=p=>{const e=JA&&plJa(p);return e&&e[0]?(e[2]||e[0].split("・").pop()):p.name};
+/* the API sends some characters as HTML entities (O&apos;Brien) */
+const unent=s=>String(s??"").replace(/&(apos|#39|quot|lt|gt|amp);/g,(m,k)=>({apos:"'","#39":"'",quot:'"',lt:"<",gt:">",amp:"&"}[k]));
+const pName=p=>{const e=JA&&plJa(p);return e&&e[0]||unent(p.name)};
+const pShort=p=>{const e=JA&&plJa(p);return e&&e[0]?(e[2]||e[0].split("・").pop()):unent(p.name)};
 async function loadNames(){try{const r=await fetch("names.json",{cache:"no-cache"});if(!r.ok)return;const j=await r.json();
   if(!j||typeof j.teams!=="object"||typeof j.players!=="object"||JSON.stringify(j)===JSON.stringify(NAMES))return;
   NAMES=j;ls.set("tacboard.names",j);refreshNames()}catch(e){}}
