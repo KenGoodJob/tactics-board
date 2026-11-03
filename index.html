@@ -105,6 +105,14 @@ details.editor>summary span.safe{color:var(--muted)}
 .lgs label{display:flex;align-items:center;gap:4px;font-size:13px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--bg)}
 .fmsg{font-size:13px;color:var(--muted);min-height:1.2em}
 .fmsg.err{color:var(--danger)}
+.star{border:0;background:none;padding:0 3px 0 0;font-size:16px;line-height:1;color:var(--muted);cursor:pointer}
+.star.on{color:var(--pending)}
+.tmbox{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
+.tmlist{display:flex;flex-wrap:wrap;gap:6px}
+.tmchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 4px 3px 12px;font-size:13px;background:var(--surface)}
+.fxlist .copy{color:var(--pending);font-weight:600}
+.tmprompt{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--pending);background:var(--surface);border-radius:10px;padding:8px 12px;margin-bottom:10px;font-size:14px}
+.tmprompt .btns{display:flex;gap:8px}
 .fxlist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 .fxlist li{display:grid;grid-template-columns:3.4em 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
 .fxlist .ko{font-family:var(--f-display);font-weight:600;font-size:17px;font-variant-numeric:tabular-nums}
@@ -173,6 +181,10 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
 <body>
 
 <div class="wrap">
+  <div class="tmprompt" id="tmPrompt" hidden>
+    <span>登録チームの試合を確認しますか(前日・当日)</span>
+    <span class="btns"><button class="update" id="tmGo" style="margin-left:0">確認する</button><button class="ghost" id="tmLater">あとで</button></span>
+  </div>
   <section class="score" aria-label="スコア">
     <div class="team home"><span class="chip" id="chipH"></span><span class="nm" id="nameH"></span></div>
     <div class="mid">
@@ -250,6 +262,20 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
         <h3 class="sub">読み込んだ試合(通信なしで開けます)</h3>
         <ul class="fxlist" id="fRecent"></ul>
       </div>
+      <div class="tmbox" id="tmBox">
+        <h3 class="sub">登録チーム</h3>
+        <div class="tmlist" id="tmList"></div>
+        <div class="frow"><button class="ghost" id="tmCheck">登録チームの試合を今すぐ確認</button></div>
+        <p class="hint">前日と当日の試合一覧(2回)と、終わった試合1つにつき2回、APIを使います。終わった試合だけを保存し、結果は表示しません。</p>
+        <div class="fmsg" id="tmMsg"></div>
+      </div>
+      <div class="tmbox">
+        <h3 class="sub">ファイルに書き出す・読み込む</h3>
+        <div class="frow"><button class="ghost" id="fxExport">読み込んだ試合を書き出す</button><button class="ghost" id="fxImport">ファイルから読み込む</button>
+          <input type="file" id="fxFile" accept=".json,application/json" hidden></div>
+        <p class="hint">「ファイル」アプリ(iCloud Drive など)に保存して、別の端末やバックアップに使えます。同じ試合で内容(保存した配置など)が違うときは、「別の内容」として時点つきで追加します。</p>
+        <div class="fmsg" id="fxMsg"></div>
+      </div>
       <details class="keybox" id="keyBox">
         <summary>APIキーの設定</summary>
         <div class="ed" style="padding:10px 0 0">
@@ -300,7 +326,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261103231052">20261103231052</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261103232857">20261103232857</span></p>
 </div>
 
 <script>
@@ -360,11 +386,11 @@ const fmOf=(t,m)=>shapeOf(t,m).fm||S.data.teams[t].formation;
 function save(){try{sessionStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
 /* "saved" shapes (system + saved positions, and the left/right flip) are kept on this device per match.
    Dragged-but-unsaved positions, time and applied events are NOT kept, so reopening a match spoils nothing. */
-function matchKey(d){return "tacboard.shape."+(d.fixture?"fx"+d.fixture:"t:"+d.teams.home.name+"|"+d.teams.away.name)}
-function keepShapes(){try{const o={flip:S.flip||{},shapes:{home:{},away:{}}};
+function matchKey(d){return "tacboard.shape."+(d.fixture?"fx"+d.fixture:"t:"+d.teams.home.name+"|"+d.teams.away.name)+(d.copy?"~"+d.copy:"")}
+function keepShapes(){try{const o={flip:S.flip||{},shapes:{home:{},away:{}},at:Date.now()};
   ["home","away"].forEach(t=>MODES.forEach(m=>{const sh=S.shapes[t][m];if(sh.fm||sh.pos)o.shapes[t][m]={fm:sh.fm,pos:sh.pos}}));
   const empty=!o.flip.home&&!o.flip.away&&!MODES.some(m=>o.shapes.home[m]||o.shapes.away[m]);
-  if(empty)localStorage.removeItem(matchKey(S.data));else localStorage.setItem(matchKey(S.data),JSON.stringify(o))}catch(e){}}
+  if(empty)localStorage.removeItem(matchKey(S.data));else localStorage.setItem(matchKey(S.data),JSON.stringify(o));touchRecent(S.data)}catch(e){}}
 function start(data){S=fresh(data);let o=null;try{o=JSON.parse(localStorage.getItem(matchKey(data))||"null")}catch(e){}
   if(!o)return;["home","away"].forEach(t=>{if(o.flip&&o.flip[t])flipTeam(t);
     MODES.forEach(m=>{const v=o.shapes&&o.shapes[t]&&o.shapes[t][m];if(v){S.shapes[t][m].fm=v.fm||null;S.shapes[t][m].pos=v.pos||null}})})}
@@ -711,12 +737,13 @@ $("fLeagues").addEventListener("change",()=>{
 });
 
 /* fixture search: only kickoff time, league and team names are shown */
+const star=t=>{const on=myTeams().some(x=>x.id===t.id);return `<button class="star${on?" on":""}" data-star="${t.id}" data-name="${esc(t.name)}" aria-pressed="${on}" aria-label="${esc(t.name)}を${on?"登録から外す":"登録する"}">${on?"★":"☆"}</button>`};
 let lastFx=null;
 function renderFixtures(list){
   const sel=ls.get("tacboard.leagues",LEAGUES.map(l=>l[0])),all=ls.get("tacboard.allLeagues",false);
   const rows=list.filter(f=>all||sel.includes(f.league.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
   $("fList").innerHTML=rows.length?rows.map(f=>`<li><span class="ko">${esc(f.fixture.date.slice(11,16))}</span>
-      <span class="vs"><span class="lg">${esc(LG_NAME[f.league.id]||f.league.name)}</span>${esc(f.teams.home.name)} vs ${esc(f.teams.away.name)}</span>
+      <span class="vs"><span class="lg">${esc(LG_NAME[f.league.id]||f.league.name)}</span>${star(f.teams.home)}${esc(f.teams.home.name)} vs ${star(f.teams.away)}${esc(f.teams.away.name)}</span>
       <button class="ghost" data-fx="${f.fixture.id}">読み込む</button></li>`).join("")
     :`<li style="display:block" class="empty">該当する試合はありません。リーグの選択や日付を変えてみてください。</li>`;
 }
@@ -788,37 +815,129 @@ function convert(fx,lineups,events){
   });
   return {fixture:fx.fixture.id,teams,events:out};
 }
+/* ---------- saved matches: list, store, open, forget ---------- */
+const MAX_RECENT=40;
+const entryId=d=>d&&d.fixture?String(d.fixture)+(d.copy?"~"+d.copy:""):null;
+const fmtAt=t=>{const d=new Date(t+9*3600e3).toISOString();return `${d.slice(5,7)}/${d.slice(8,10)} ${d.slice(11,16)}`};
+function putRecent(entry){
+  let rec=ls.get("tacboard.recent",[]).filter(r=>String(r.id)!==String(entry.id));rec.unshift(entry);
+  rec.slice(MAX_RECENT).forEach(r=>{const c=ls.get("tacboard.match."+r.id,null);if(c)ls.del(matchKey(c));ls.del("tacboard.match."+r.id)});
+  ls.set("tacboard.recent",rec.slice(0,MAX_RECENT));
+}
+function touchRecent(d){const id=entryId(d);if(!id)return;const rec=ls.get("tacboard.recent",[]),r=rec.find(x=>String(x.id)===id);
+  if(r){r.at=Date.now();ls.set("tacboard.recent",rec)}}
+function storeMatch(f,data){
+  ls.set("tacboard.match."+f.fixture.id,data);
+  putRecent({id:String(f.fixture.id),date:f.fixture.date.slice(0,10),label:`${f.teams.home.name} vs ${f.teams.away.name}`,lg:LG_NAME[f.league.id]||f.league.name,at:Date.now()});
+}
+const isDone=f=>f.done!=null?f.done:["FT","AET","PEN"].includes(f.fixture.status&&f.fixture.status.short);
+async function fetchMatch(f){
+  const fid=f.fixture.id;
+  const [lineups,events]=await Promise.all([api("fixtures/lineups?fixture="+fid),api("fixtures/events?fixture="+fid)]);
+  return lineups.length?convert(f,lineups,events):null;
+}
 async function loadFixture(fid){
   const cached=ls.get("tacboard.match."+fid,null);
   if(cached){loadMatch(cached);fmsg("fMsg","保存済みのデータを開きました(通信なし)");closeFinder();return}
   const f=(lastFx||[]).find(x=>x.fixture.id===fid);if(!f)return;
   fmsg("fMsg","読み込んでいます…");
   try{
-    const [lineups,events]=await Promise.all([api("fixtures/lineups?fixture="+fid),api("fixtures/events?fixture="+fid)]);
-    if(!lineups.length){fmsg("fMsg","この試合のスタメンはまだ発表されていません。キックオフの約1時間前から取得できます。"+quotaText(),true);return}
-    const data=convert(f,lineups,events);
-    const done=f.done!=null?f.done:["FT","AET","PEN"].includes(f.fixture.status&&f.fixture.status.short);
-    if(done){ls.set("tacboard.match."+fid,data);
-      const rec=ls.get("tacboard.recent",[]).filter(r=>r.id!==fid);
-      rec.unshift({id:fid,date:f.fixture.date.slice(0,10),label:`${f.teams.home.name} vs ${f.teams.away.name}`,lg:LG_NAME[f.league.id]||f.league.name});
-      ls.set("tacboard.recent",rec.slice(0,20));renderRecent()}
+    const data=await fetchMatch(f);
+    if(!data){fmsg("fMsg","この試合のスタメンはまだ発表されていません。キックオフの約1時間前から取得できます。"+quotaText(),true);return}
+    const done=isDone(f);if(done){storeMatch(f,data);renderRecent()}
     loadMatch(data);
     fmsg("fMsg",(done?"読み込みました ":"読み込みました。試合が終わる前のデータなので、出来事は途中までです ")+quotaText());closeFinder();
   }catch(e){fmsg("fMsg",e.message,true)}
 }
 function closeFinder(){setTimeout(()=>{$("finder").open=false;window.scrollTo({top:0,behavior:"smooth"})},600)}
-$("fList").addEventListener("click",e=>{const b=e.target.closest("[data-fx]");if(b)loadFixture(+b.dataset.fx)});
+$("fList").addEventListener("click",e=>{
+  const st=e.target.closest("[data-star]");if(st){toggleTeam(+st.dataset.star,st.dataset.name);return}
+  const b=e.target.closest("[data-fx]");if(b)loadFixture(+b.dataset.fx)});
 function renderRecent(){
   const rec=ls.get("tacboard.recent",[]);$("fRecentBox").hidden=!rec.length;
   $("fRecent").innerHTML=rec.map(r=>`<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}</span>
-    <span class="vs"><span class="lg">${esc(r.lg)}</span>${esc(r.label)}</span>
-    <span style="display:flex;gap:6px"><button class="ghost" data-open="${r.id}">開く</button><button class="del" data-forget="${r.id}" aria-label="一覧から消す">消す</button></span></li>`).join("");
+    <span class="vs"><span class="lg">${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${esc(r.label)}</span>
+    <span style="display:flex;gap:6px"><button class="ghost" data-open="${esc(r.id)}">開く</button><button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`).join("");
 }
 $("fRecent").addEventListener("click",e=>{
   const o=e.target.closest("[data-open]"),d=e.target.closest("[data-forget]");
   if(o){const c=ls.get("tacboard.match."+o.dataset.open,null);if(c){loadMatch(c);fmsg("fMsg","保存済みのデータを開きました(通信なし)");closeFinder()}}
   if(d){const c=ls.get("tacboard.match."+d.dataset.forget,null);if(c)ls.del(matchKey(c));ls.del("tacboard.match."+d.dataset.forget);ls.set("tacboard.recent",ls.get("tacboard.recent",[]).filter(r=>String(r.id)!==d.dataset.forget));renderRecent()}
 });
+
+/* ---------- export / import of saved matches as a file (for the Files app / iCloud Drive) ---------- */
+const sameContent=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+const strip=it=>{const d={...it.data};delete d.copy;const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
+$("fxExport").onclick=async()=>{
+  const rec=ls.get("tacboard.recent",[]);
+  const items=rec.map(r=>{const data=ls.get("tacboard.match."+r.id,null);if(!data)return null;const shape=ls.get(matchKey(data),null);
+    return {id:String(r.id),date:r.date,label:r.label,lg:r.lg,at:Math.max(r.at||0,shape&&shape.at||0)||null,copy:r.copy||null,data,shape}}).filter(Boolean);
+  if(!items.length){fmsg("fxMsg","書き出す試合がありません",true);return}
+  const now=Date.now(),stamp=new Date(now+9*3600e3).toISOString().slice(0,16).replace(/[-:]/g,"").replace("T","-");
+  const name=`tactics-board-${stamp}.json`,text=JSON.stringify({app:"tactics-board",kind:"matches",version:1,exportedAt:now,items});
+  const file=new File([text],name,{type:"application/json"});
+  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});fmsg("fxMsg",`${items.length} 試合を書き出しました`);return}}
+  catch(e){if(e&&e.name==="AbortError"){fmsg("fxMsg","書き出しを取り消しました");return}}
+  const a=document.createElement("a");a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);fmsg("fxMsg",`${items.length} 試合を書き出しました(ダウンロード)`);
+};
+$("fxImport").onclick=()=>$("fxFile").click();
+$("fxFile").onchange=async e=>{
+  const file=e.target.files&&e.target.files[0];e.target.value="";if(!file)return;
+  let j;try{j=JSON.parse(await file.text())}catch(err){fmsg("fxMsg","ファイルを読み取れませんでした",true);return}
+  if(!j||j.app!=="tactics-board"||!Array.isArray(j.items)){fmsg("fxMsg","このアプリで書き出したファイルではありません",true);return}
+  let added=0,copies=0,same=0;
+  j.items.slice().reverse().forEach(it=>{
+    if(!it||!it.data||!it.data.teams||!it.data.teams.home||!Array.isArray(it.data.events)||!it.data.fixture)return;
+    const base=String(it.data.fixture),incoming=strip(it);
+    const rec=ls.get("tacboard.recent",[]);
+    const mine=rec.filter(r=>String(r.id).split("~")[0]===base).map(r=>{const data=ls.get("tacboard.match."+r.id,null);return data?{r,data,shape:ls.get(matchKey(data),null)}:null}).filter(Boolean);
+    if(mine.some(m=>sameContent(strip(m),incoming))){same++;return}
+    const at=it.at||j.exportedAt||Date.now();let copy=null;
+    if(mine.length){copy=new Date(at+9*3600e3).toISOString().slice(0,16).replace(/[-:T]/g,"");let k=copy,n=2;
+      while(rec.some(r=>String(r.id)===base+"~"+k))k=copy+"-"+(n++);copy=k}
+    const data={...incoming.d};if(copy)data.copy=copy;const id=entryId(data);
+    ls.set("tacboard.match."+id,data);
+    if(incoming.s)ls.set(matchKey(data),{...incoming.s,at});else ls.del(matchKey(data));
+    putRecent({id,date:it.date||"",label:it.label||`${data.teams.home.name} vs ${data.teams.away.name}`,lg:it.lg||"",at,copy});
+    copy?copies++:added++;
+  });
+  renderRecent();
+  fmsg("fxMsg",`読み込みました: 追加 ${added} 件 / 別の内容として追加 ${copies} 件 / 同じ内容のため省略 ${same} 件`);
+};
+
+/* ---------- registered teams: confirm, then fetch their finished matches of yesterday and today ---------- */
+const CHECK_EVERY=3*3600e3;
+const myTeams=()=>ls.get("tacboard.teams",[]);
+function toggleTeam(id,name){let t=myTeams();t=t.some(x=>x.id===id)?t.filter(x=>x.id!==id):[...t,{id,name}];ls.set("tacboard.teams",t);
+  renderTeams();if(lastFx)renderFixtures(lastFx);promptCheck()}
+function renderTeams(){const t=myTeams();
+  $("tmList").innerHTML=t.length?t.map(x=>`<span class="tmchip">${esc(x.name)}<button class="del" data-unstar="${x.id}" aria-label="${esc(x.name)}の登録を外す">外す</button></span>`).join("")
+    :`<span class="hint">試合一覧のチーム名の横の ☆ を押すと登録できます</span>`;
+  $("tmCheck").disabled=!t.length}
+$("tmList").addEventListener("click",e=>{const b=e.target.closest("[data-unstar]");if(b){const t=myTeams().find(x=>x.id===+b.dataset.unstar);if(t)toggleTeam(t.id,t.name)}});
+function promptCheck(){const last=ls.get("tacboard.teamCheck",0);
+  $("tmPrompt").hidden=!(myTeams().length&&ls.get("tacboard.apikey","")&&Date.now()-last>CHECK_EVERY)}
+async function checkTeams(){
+  const ids=new Set(myTeams().map(x=>x.id));if(!ids.size)return;
+  $("tmPrompt").hidden=true;$("tmCheck").disabled=true;fmsg("tmMsg","確認しています…");
+  let saved=0;
+  try{
+    for(const date of [shiftDate(todayJST(),-1),todayJST()]){
+      const list=await api(`fixtures?date=${date}&timezone=Asia/Tokyo`);
+      for(const f of list){
+        if(!(ids.has(f.teams.home.id)||ids.has(f.teams.away.id))||!isDone(f)||ls.get("tacboard.match."+f.fixture.id,null))continue;
+        const data=await fetchMatch(f);if(data){storeMatch(f,data);saved++}
+      }
+    }
+    ls.set("tacboard.teamCheck",Date.now());renderRecent();
+    fmsg("tmMsg",saved?`登録チームの終わった試合を ${saved} 件保存しました。「読み込んだ試合」から開けます`:"新しく保存する試合はありませんでした");
+  }catch(e){fmsg("tmMsg",e.message+(saved?`(${saved} 件は保存済み)`:""),true);renderRecent()}
+  $("tmCheck").disabled=false;
+}
+$("tmCheck").onclick=checkTeams;
+$("tmGo").onclick=()=>{$("finder").open=true;checkTeams();setTimeout(()=>$("tmBox").scrollIntoView({behavior:"smooth",block:"center"}),50)};
+$("tmLater").onclick=()=>{$("tmPrompt").hidden=true};
 
 /* key settings */
 function renderKey(){const k=ls.get("tacboard.apikey","");$("fKey").value="";
@@ -827,7 +946,7 @@ $("fKeySave").onclick=()=>{const v=$("fKey").value.trim();if(!v){fmsg("fKeyMsg",
 $("fUsage").onclick=checkUsage;
 $("fKeyDel").onclick=()=>{ls.del("tacboard.apikey");renderKey()};
 
-$("fDate").value=todayJST();dateRange();renderUsage();renderLeagues();renderRecent();renderKey();
+$("fDate").value=todayJST();dateRange();renderUsage();renderLeagues();renderRecent();renderKey();renderTeams();promptCheck();
 
 buildChips();renderEditor();render();
 })();
