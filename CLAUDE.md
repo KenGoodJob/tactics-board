@@ -35,7 +35,9 @@
   - 端末ごとの保存なので、iPad と iPhone では共有されない
 
 ### 試合データ(API-Football)
-- `https://v3.football.api-sports.io/`、ヘッダー `x-apisports-key`。無料プランは1日100リクエスト
+- `https://v3.football.api-sports.io/`、ヘッダー `x-apisports-key`。無料プランは1日100リクエスト(00:00 UTC = 日本時間9時にリセット)
+- **無料プランで取れる日付は前日・当日・翌日だけ**(それ以外は "Free plans do not have access to this date")。日付欄と前日/翌日ボタンもこの範囲に制限している
+- 使用回数: 応答ヘッダー `x-ratelimit-requests-limit/remaining` と `status` エンドポイントの `requests.current/limit_day` から「本日のAPI使用: N / 100 回」を表示(`tacboard.usage` に UTC の日付つきで保存)
 - APIキーは画面で入力し、その端末の localStorage にだけ保存する。**リポジトリには絶対に入れない**
 - 検索: `fixtures?date=YYYY-MM-DD&timezone=Asia/Tokyo` を1回。一覧にはキックオフ時刻・リーグ・対戦カードだけを出す(スコアや status は表示もキャッシュもしない)
 - 読み込み: `fixtures/lineups` と `fixtures/events`。終了済み(FT/AET/PEN)の試合だけ端末に保存して再利用
@@ -52,8 +54,8 @@
 - og の team はオウンゴールした選手のチーム(得点は相手側に入る)
 
 ## 未確認の点
-- 無料プランで今シーズンのデータが取れるか(ユーザーがまだAPIキー未取得)
-- API の grid(列番号)の左右の向き。今は列番号の小さい順に「右→左」として並べている。逆なら「左右を反転」で直せるが、確認できたら既定値を直す
+- (確認済み)無料プランでも今シーズンのデータは取れる。ただし日付は前日〜翌日のみ
+- (確認済み)API の grid の列番号は大きい方が右。同じ列の中は列番号の大きい順に並べて「右→左」にしている。この修正より前に端末へ保存した試合データは古い向きのまま
 
 ## 作業ルール
 - 個人情報・メールアドレス・アカウント情報・パスワード・APIキーをリポジトリに入れない。サンプルの選手名とチーム名は架空のもの
