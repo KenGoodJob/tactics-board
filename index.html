@@ -332,7 +332,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104000231">20261104000231</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104002258">20261104002258</span></p>
 </div>
 
 <script>
@@ -400,7 +400,10 @@ function keepShapes(){try{const o={flip:S.flip||{},shapes:{home:{},away:{}},at:D
 function start(data){S=fresh(data);let o=null;try{o=JSON.parse(localStorage.getItem(matchKey(data))||"null")}catch(e){}
   if(!o)return;["home","away"].forEach(t=>{if(o.flip&&o.flip[t])flipTeam(t);
     MODES.forEach(m=>{const v=o.shapes&&o.shapes[t]&&o.shapes[t][m];if(v){S.shapes[t][m].fm=v.fm||null;S.shapes[t][m].pos=v.pos||null}})})}
-if(!S||!S.data||!S.data.teams||!S.shapes||!S.shapes.home.nrm){start(clone(SAMPLE))}
+/* on a fresh launch, reopen the last saved match at kickoff (nothing applied, so nothing is spoiled) */
+function lastSaved(){try{const id=JSON.parse(localStorage.getItem("tacboard.last")||"null");if(id==null)return null;
+  const d=JSON.parse(localStorage.getItem("tacboard.match."+id)||"null");return d&&d.teams&&d.teams.home&&Array.isArray(d.events)?d:null}catch(e){return null}}
+if(!S||!S.data||!S.data.teams||!S.shapes||!S.shapes.home.nrm){start(lastSaved()||clone(SAMPLE))}
 /* ends: teams change ends for the 2nd half and 2nd half of extra time (like a broadcast); positions are stored as at kickoff */
 function endsFlipped(){const seg=norm(S.applied).seg;const second=seg==="2H"||seg==="ET2"||seg==="PK";return (S.autoEnds!==false&&second)!==!!S.endSwap}
 const endView=p=>endsFlipped()?{x:105-p.x,y:68-p.y}:p;
@@ -690,9 +693,9 @@ $("exportBtn").onclick=()=>{const s=JSON.stringify(S.data,null,1);$("json").valu
   try{navigator.clipboard.writeText(s).then(done,()=>{$("json").select();$("jsonMsg").textContent="選択しました。コピーしてください"})}catch(err){$("json").select()}};
 $("importBtn").onclick=()=>{try{const d=JSON.parse($("json").value);
   if(!d.teams||!d.teams.home||!d.teams.away||!Array.isArray(d.events))throw 0;
-  start(d);save();renderEditor();render();$("jsonMsg").textContent="読み込みました(時間はキックオフに戻りました)";
+  start(d);rememberLast(d);save();renderEditor();render();$("jsonMsg").textContent="読み込みました(時間はキックオフに戻りました)";
   }catch(err){$("jsonMsg").textContent="読み込めませんでした。書き出したときの形式のJSONを貼り付けてください"}};
-$("sampleBtn").onclick=()=>{start(clone(SAMPLE));save();renderEditor();render();$("jsonMsg").textContent="サンプル試合に戻しました"};
+$("sampleBtn").onclick=()=>{start(clone(SAMPLE));rememberLast(null);save();renderEditor();render();$("jsonMsg").textContent="サンプル試合に戻しました"};
 
 /* ---------- left/right flip for starters ---------- */
 function flipTeam(t){
@@ -701,7 +704,9 @@ function flipTeam(t){
   T.players=[...out.filter(Boolean),...bn];MODES.forEach(m=>{S.shapes[t][m].pos=null;S.shapes[t][m].work={}});
   S.flip=S.flip||{};S.flip[t]=!S.flip[t];
 }
-function loadMatch(data){start(data);save();renderEditor();render()}
+function loadMatch(data){start(data);rememberLast(data);save();renderEditor();render()}
+/* remember the last opened match only if it is saved on this device; otherwise next launch shows the sample */
+function rememberLast(data){const id=data&&entryId(data);try{if(id&&localStorage.getItem("tacboard.match."+id))localStorage.setItem("tacboard.last",JSON.stringify(id));else localStorage.removeItem("tacboard.last")}catch(e){}}
 
 /* ---------- API-Football (key stays in this browser only) ---------- */
 const API="https://v3.football.api-sports.io/";
