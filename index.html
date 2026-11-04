@@ -214,6 +214,7 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .jmenu button:last-child{border-bottom:0}
 .ev .evn{font-size:11px;color:var(--muted);margin-left:2px}
 .ev .pn{text-decoration:underline dotted;text-underline-offset:3px}
+.pst .cap{display:inline-block;margin-left:4px;padding:0 4px;border-radius:3px;font-size:10px;font-weight:700;line-height:15px;color:#fff;background:var(--accent);vertical-align:1px;text-decoration:none}
 .pst td.pn{text-decoration:underline dotted;text-underline-offset:3px}
 .pcard{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
 .pcbox{background:var(--surface);color:var(--fg);border-radius:14px;width:min(560px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
@@ -436,7 +437,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105052056">20261105052056</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105053627">20261105053627</span></p>
 </div>
 
 <script>
@@ -552,7 +553,7 @@ function testStats(d,withH1,len){let seed=7;const rnd=(a,b)=>{seed=(seed*16807)%
       const c=(ty,k)=>d.events.filter(e=>e.type===ty&&e[k]===p.id&&e.period!=="PK").length;
       players[t].push({pid:p.id,name:p.name,min,rt:(rnd(58,85)/10).toFixed(1),g:c("goal","player"),a:c("goal","assist"),sh:rnd(0,4),sot:rnd(0,2),
         pas:Math.round(min*rnd(25,70)/100),acc:rnd(65,95),kp:rnd(0,3),tk:rnd(0,5),int:rnd(0,3),dw:rnd(1,10),drb:rnd(0,3),fd:rnd(0,3),fc:rnd(0,3),sv:p.pos==="G"?rnd(1,6):null,
-        dt:rnd(3,16),da:rnd(0,5),off:p.pos==="F"?rnd(0,2):0,pw:rnd(0,9)>8?1:0,pc:rnd(0,9)>8?1:0,pm:c("pen_miss","player"),ps:p.pos==="G"?rnd(0,9)>8?1:0:null,gc:p.pos==="G"?rnd(0,3):null})})});
+        dt:rnd(3,16),da:rnd(0,5),off:p.pos==="F"?rnd(0,2):0,pw:rnd(0,9)>8?1:0,pc:rnd(0,9)>8?1:0,pm:c("pen_miss","player"),ps:p.pos==="G"?rnd(0,9)>8?1:0:null,gc:p.pos==="G"?rnd(0,3):null,...(String(p.num)==="10"?{cap:true}:{})})})});
   out.players=players;return out}
 const TESTS=[
   ["a","延長・PK戦(7本目で決着)・GK交代・2枚目の警告・ハットトリック・OG・前半スタッツあり",TEST_A],
@@ -806,7 +807,7 @@ function playerStatsHtml(ps){if(!ps)return "";const T=S.data.teams,list=(ps[PS_T
   const nm=r=>{const p=pm[r.pid];return p?(p.num!==""?p.num+" ":"")+pName(p):r.name};
   return `<div class="pstab">${["home","away"].map(t=>`<button class="ghost${PS_TEAM===t?" on":""}" data-psteam="${t}">${logo(T[t].apiId)}${esc(tName(T[t].apiId,T[t].name))}</button>`).join("")}</div>
     <div class="pswrap"><table class="pst"><thead><tr><th>選手</th>${PS_COLS.map(([k,l])=>`<th><button data-pssort="${k}" class="${PS_SORT===k?"on":""}">${l}</button></th>`).join("")}</tr></thead>
-    <tbody>${list.map(r=>`<tr><td${r.pid&&pm[r.pid]?` class="pn" data-pinfo="${esc(r.pid)}"`:""}>${esc(nm(r))}</td>${PS_COLS.map(([k])=>`<td>${r[k]==null||r[k]===""?"–":esc(r[k])}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${PS_COLS.length+1}">データがありません</td></tr>`}</tbody></table></div>`}
+    <tbody>${list.map(r=>`<tr><td${r.pid&&pm[r.pid]?` class="pn" data-pinfo="${esc(r.pid)}"`:""}>${esc(nm(r))}${r.cap?`<span class="cap" title="キャプテン">C</span>`:""}</td>${PS_COLS.map(([k])=>`<td>${r[k]==null||r[k]===""?"–":esc(r[k])}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${PS_COLS.length+1}">データがありません</td></tr>`}</tbody></table></div>`}
 function statsPanel(kind){const st=S.data.stats||{};let h="";
   if(STATS_BUSY===kind)return `<p class="empty">取得しています…</p>`;
   if(kind==="ht"){
@@ -849,7 +850,7 @@ async function fetchStats(kind,force){const fx=S.data.fixture;if(!fx)return;cons
             tk:n(s.tackles&&s.tackles.total),int:n(s.tackles&&s.tackles.interceptions),dw:n(s.duels&&s.duels.won),
             drb:n(s.dribbles&&s.dribbles.success),fd:n(s.fouls&&s.fouls.drawn),fc:n(s.fouls&&s.fouls.committed),sv:n(s.goals&&s.goals.saves),
             dt:n(s.duels&&s.duels.total),da:n(s.dribbles&&s.dribbles.attempts),off:n(s.offsides),pw:n(pe.won),pc:n(pe.commited??pe.committed),pm:n(pe.missed),
-            ps:n(pe.saved),gc:g.position==="G"?n(s.goals&&s.goals.conceded):null})})});
+            ps:n(pe.saved),gc:g.position==="G"?n(s.goals&&s.goals.conceded):null,...(g.captain?{cap:true}:{})})})});
       st.players=out.home.length||out.away.length?out:null;if(!st.players)STATS_MSG="選手スタッツはまだありませんでした";
     }
     keepStats();
