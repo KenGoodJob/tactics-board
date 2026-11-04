@@ -190,6 +190,23 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .log .t{font-family:var(--f-display);font-weight:600;font-variant-numeric:tabular-nums;text-align:right}
 .badge{font-size:11px;font-weight:700;padding:0 6px;border-radius:4px;color:#fff;white-space:nowrap}
 .empty{color:var(--muted);font-size:13px;margin:0}
+.plist li[data-pinfo]{cursor:pointer}
+.pcard{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
+.pcbox{background:var(--surface);color:var(--fg);border-radius:14px;width:min(560px,100%);max-height:calc(100dvh - 32px);overflow:auto;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.3)}
+.pchd{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.pchd img.pcf{width:84px;height:84px;flex:none;margin:0;border-radius:50%;object-fit:cover;object-position:top;background:var(--line)}
+.pchd h3{margin:0;font-size:18px;line-height:1.3}
+.pchd .pct{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:4px}
+.pchd .pcx{margin-left:auto;align-self:flex-start;border:0;background:none;font-size:22px;line-height:1;padding:4px 8px;color:var(--muted)}
+.pcprof{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:14px;margin:0 0 10px}
+.pcprof dt{color:var(--muted)}.pcprof dd{margin:0}
+.pcwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.pcst{border-collapse:collapse;font-size:13px;width:100%;white-space:nowrap}
+.pcst th,.pcst td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}
+.pcst th:first-child,.pcst td:first-child{text-align:left;white-space:normal;min-width:7em}
+.pcst tr.tot td{font-weight:700;border-top:2px solid var(--line)}
+.pcnote{font-size:13px;color:var(--muted);margin:8px 0 0}
+.pcget{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px;align-items:flex-start}
 
 /* editor */
 details.editor{background:var(--surface);border:1px solid var(--line);border-radius:10px}
@@ -381,7 +398,8 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104154032">20261104154032</span></p>
+  <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104160603">20261104160603</span></p>
 </div>
 
 <script>
@@ -666,7 +684,7 @@ function render(){
     $(t==="home"?"benchH":"benchA").innerHTML=players(t).map(p=>{
       const tags=(st.tags[p.id]||[]).map(x=>`<span class="tag ${x.cls}">${x.pre||""}${esc(x.txt)}</span>`).join(" ");
       const gone=!on.has(p.id);
-      return `<li class="${gone?"gone":""}"><span class="num">${esc(p.num)}</span><span>${faceImg(p)}${esc(pName(p))}${p.starter?"":` <span class="tag">控え</span>`}</span><span>${tags}</span></li>`;
+      return `<li class="${gone?"gone":""}" data-pinfo="${esc(p.id)}"><span class="num">${esc(p.num)}</span><span>${faceImg(p)}${esc(pName(p))}${p.starter?"":` <span class="tag">控え</span>`}</span><span>${tags}</span></li>`;
     }).join("");
   });
   // log: one row per moment, home left / away right
@@ -793,7 +811,7 @@ function ratingSvg(v){if(!v)return "";const c=v>=8?"#1f8a52":v>=7?"#3d7fbf":v>=6
 function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier,rt}){
   const col=S.data.teams[t].color,fg=textOn(col),fu=showF&&faceUrl(p),face=!!fu&&!FACE_BAD.has(fu),bg=gk?"#e9e4d6":col,sh=pShort(p),m=marks[p.id];
   const sc=bench?BENCH_SC:1,ly=bench?(tier?7.1:4.7):4.9;
-  return `<g class="pl${gone?" gone":""}" data-team="${t}" ${attr} data-sc="${sc}" transform="translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})${sc!==1?` scale(${sc})`:""}" style="cursor:grab"${gone?` opacity=".45"`:""}>
+  return `<g class="pl${gone?" gone":""}" data-team="${t}" data-pid="${esc(p.id)}" ${attr} data-sc="${sc}" transform="translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})${sc!==1?` scale(${sc})`:""}" style="cursor:grab"${gone?` opacity=".45"`:""}>
     <circle r="3.4" fill="transparent"/>
     ${gk?`<circle r="2.95" fill="none" stroke="${col}" stroke-width=".45"/>`:""}
     <circle class="pbg" r="2.4" fill="${face?"#dfe2dc":bg}" data-fill="${bg}" stroke="rgba(0,0,0,.45)" stroke-width=".25"/>
@@ -890,13 +908,14 @@ svg.addEventListener("pointerdown",ev=>{
   const g=ev.target.closest(".pl");if(!g)return;ev.preventDefault();
   const p=svgPt(ev);const m=/translate\(([-\d.]+) ([-\d.]+)\)/.exec(g.getAttribute("transform"));
   const sc=+g.dataset.sc||1;
-  drag={g,dx:+m[1]-p.x,dy:+m[2]-p.y,x:+m[1],y:+m[2],suf:sc!==1?` scale(${sc})`:"",ymax:benchBottom(benchRows())+2};g.classList.add("dragging");g.style.cursor="grabbing";
+  drag={g,cx:ev.clientX,cy:ev.clientY,moved:false,dx:+m[1]-p.x,dy:+m[2]-p.y,x:+m[1],y:+m[2],suf:sc!==1?` scale(${sc})`:"",ymax:benchBottom(benchRows())+2};g.classList.add("dragging");g.style.cursor="grabbing";
   svg.appendChild(g);try{svg.setPointerCapture(ev.pointerId)}catch(e){}
 });
-svg.addEventListener("pointermove",ev=>{if(!drag)return;const p=svgPt(ev);
+svg.addEventListener("pointermove",ev=>{if(!drag)return;if(!drag.moved&&Math.hypot(ev.clientX-drag.cx,ev.clientY-drag.cy)<8)return;drag.moved=true;const p=svgPt(ev);
   drag.x=Math.max(-2,Math.min(107,p.x+drag.dx));drag.y=Math.max(-3,Math.min(drag.ymax,p.y+drag.dy));
   drag.g.setAttribute("transform",`translate(${drag.x.toFixed(2)} ${drag.y.toFixed(2)})${drag.suf}`)});
-function endDrag(){if(!drag)return;const g=drag.g;
+function endDrag(ev){if(!drag)return;const g=drag.g;
+  if(!drag.moved){g.classList.remove("dragging");g.style.cursor="grab";drag=null;if(ev&&ev.type==="pointerup")openPinfo(g.dataset.pid);return}
   if(g.dataset.bench)BENCH_POS[g.dataset.bench]={x:drag.x,y:drag.y};else shapeOf(g.dataset.team).work[g.dataset.slot]=endView({x:drag.x,y:drag.y});
   g.classList.remove("dragging");g.style.cursor="grab";drag=null;save()}
 svg.addEventListener("pointerup",endDrag);svg.addEventListener("pointercancel",endDrag);
@@ -1051,7 +1070,7 @@ async function api(path){
   let j;try{j=await r.json()}catch(e){throw new Error("APIの応答を読み取れませんでした(HTTP "+r.status+")")}
   const errs=j&&j.errors?(Array.isArray(j.errors)?j.errors:Object.values(j.errors)):[];
   if(errs.length)throw new Error("APIエラー: "+errs.join(" / "));
-  return j.response||[];
+  const res=j.response||[];res.paging=j.paging||null;return res;
 }
 function fmsg(id,text,err){$(id).textContent=text;$(id).classList.toggle("err",!!err)}
 const quotaText=()=>quota!=null?`(本日の残りリクエスト: ${quota})`:"";
@@ -1099,7 +1118,7 @@ async function search(){
 }
 /* keep only what the board needs; scores and status are dropped before caching */
 const slimFx=f=>({fixture:{id:f.fixture.id,date:f.fixture.date,timestamp:f.fixture.timestamp},
-  league:{id:f.league.id,name:f.league.name},teams:{home:{id:f.teams.home.id,name:f.teams.home.name},away:{id:f.teams.away.id,name:f.teams.away.name}},
+  league:{id:f.league.id,name:f.league.name,season:f.league.season},teams:{home:{id:f.teams.home.id,name:f.teams.home.name},away:{id:f.teams.away.id,name:f.teams.away.name}},
   done:["FT","AET","PEN"].includes(f.fixture.status&&f.fixture.status.short)});
 $("fSearch").onclick=search;
 /* the free plan only serves yesterday, today and tomorrow */
@@ -1156,8 +1175,94 @@ function convert(fx,lineups,events){
       out.push({...base,type:"sub",team:s,player:o,playerIn:i});
     }
   });
-  return {fixture:fx.fixture.id,teams,events:out};
+  return {fixture:fx.fixture.id,kickoff:fx.fixture.timestamp?fx.fixture.timestamp*1000:null,season:fx.league&&fx.league.season||null,teams,events:out};
 }
+/* ---------- player info card: profile (age, nationality…) and season stats per competition ----------
+   Spoiler rule: stats come only from a snapshot taken BEFORE this match's kickoff. Snapshots are stored per team
+   (tacboard.pinfo.<team id>, newest 3), so deleting old matches never affects them. Fetched only when the user taps the button. */
+const PI_KEEP=3,PI_TEAMS=60;
+const piKey=id=>"tacboard.pinfo."+id;
+const POS_JA={Goalkeeper:"GK",Defender:"DF",Midfielder:"MF",Attacker:"FW"};
+const NAT_JA={England:"イングランド",Scotland:"スコットランド",Wales:"ウェールズ","Northern Ireland":"北アイルランド",Ireland:"アイルランド",Spain:"スペイン",Italy:"イタリア",Germany:"ドイツ",France:"フランス",
+  Portugal:"ポルトガル",Netherlands:"オランダ",Belgium:"ベルギー",Switzerland:"スイス",Austria:"オーストリア",Denmark:"デンマーク",Sweden:"スウェーデン",Norway:"ノルウェー",Finland:"フィンランド",Iceland:"アイスランド",
+  Poland:"ポーランド","Czech Republic":"チェコ",Czechia:"チェコ",Slovakia:"スロバキア",Hungary:"ハンガリー",Croatia:"クロアチア",Serbia:"セルビア",Slovenia:"スロベニア","Bosnia and Herzegovina":"ボスニア・ヘルツェゴビナ",
+  Montenegro:"モンテネグロ","North Macedonia":"北マケドニア",Albania:"アルバニア",Kosovo:"コソボ",Greece:"ギリシャ",Turkey:"トルコ","Türkiye":"トルコ",Romania:"ルーマニア",Bulgaria:"ブルガリア",Ukraine:"ウクライナ",
+  Russia:"ロシア",Georgia:"ジョージア",Armenia:"アルメニア",Israel:"イスラエル",Luxembourg:"ルクセンブルク",Brazil:"ブラジル",Argentina:"アルゼンチン",Uruguay:"ウルグアイ",Colombia:"コロンビア",Chile:"チリ",
+  Ecuador:"エクアドル",Paraguay:"パラグアイ",Peru:"ペルー",Venezuela:"ベネズエラ",Mexico:"メキシコ",USA:"アメリカ","United States":"アメリカ",Canada:"カナダ",Jamaica:"ジャマイカ","Costa Rica":"コスタリカ",
+  Morocco:"モロッコ",Algeria:"アルジェリア",Tunisia:"チュニジア",Egypt:"エジプト",Senegal:"セネガル",Nigeria:"ナイジェリア",Ghana:"ガーナ","Ivory Coast":"コートジボワール","Côte d'Ivoire":"コートジボワール",Cameroon:"カメルーン",
+  Mali:"マリ","Burkina Faso":"ブルキナファソ",Guinea:"ギニア","Congo DR":"コンゴ民主共和国",Congo:"コンゴ",Gabon:"ガボン","Cape Verde Islands":"カーボベルデ","Cape Verde":"カーボベルデ",Angola:"アンゴラ",
+  "South Africa":"南アフリカ",Zambia:"ザンビア",Gambia:"ガンビア","Guinea-Bissau":"ギニアビサウ",Benin:"ベナン",Togo:"トーゴ",Japan:"日本","Korea Republic":"韓国","South Korea":"韓国",Australia:"オーストラリア",
+  Iran:"イラン",Uzbekistan:"ウズベキスタン","Saudi Arabia":"サウジアラビア",China:"中国","New Zealand":"ニュージーランド",Suriname:"スリナム",Curacao:"キュラソー","Curaçao":"キュラソー"};
+function kickoffOf(d){if(!d)return null;if(d.kickoff)return d.kickoff;
+  const id=entryId(d),r=id&&ls.get("tacboard.recent",[]).find(x=>String(x.id)===id);
+  return r&&r.date?Date.parse(r.date+"T00:00:00+09:00"):null}   /* older saved matches: start of the match day (earlier than the real kickoff, so still safe) */
+function seasonOf(d){if(d.season)return d.season;const k=kickoffOf(d);if(!k)return null;const x=new Date(k+9*3600e3);return x.getUTCMonth()>=6?x.getUTCFullYear():x.getUTCFullYear()-1}
+function piSnaps(teamId){const l=ls.get(piKey(teamId),[]);return Array.isArray(l)?l:[]}
+function piFor(t){const T=S.data.teams[t];if(!T.apiId)return null;const list=piSnaps(T.apiId),ko=kickoffOf(S.data),season=seasonOf(S.data);
+  const pre=ko?list.filter(s=>s.at<ko&&s.season===season).pop()||null:null;
+  return {pre,last:list[list.length-1]||null,later:ko?list.some(s=>s.at>=ko):false,ko}}
+function ageAt(birth,at){if(!birth)return null;const b=new Date(birth+"T00:00:00Z"),d=new Date((at||Date.now())+9*3600e3);if(isNaN(b))return null;
+  let a=d.getUTCFullYear()-b.getUTCFullYear();if(d.getUTCMonth()<b.getUTCMonth()||(d.getUTCMonth()===b.getUTCMonth()&&d.getUTCDate()<b.getUTCDate()))a--;return a}
+let PC_PID=null,PC_BUSY=false,PC_MSG="",PC_ERR=false;
+function openPinfo(pid){if(!pid)return;PC_PID=pid;PC_MSG="";PC_ERR=false;renderPinfo();$("pcard").hidden=false}
+function closePinfo(){$("pcard").hidden=true;PC_PID=null}
+function renderPinfo(){const pm=pmap(),p=pm[PC_PID];if(!p){closePinfo();return}
+  const t=PC_PID.startsWith("home")?"home":PC_PID.startsWith("away")?"away":(players("home").includes(p)?"home":"away"),T=S.data.teams[t];
+  const info=piFor(t),prof=p.apiId!=null&&info?(info.pre&&info.pre.p[p.apiId])||(info.last&&info.last.p[p.apiId])||null:null;
+  const statsSrc=p.apiId!=null&&info&&info.pre?info.pre.p[p.apiId]||null:null;
+  const fu=faceUrl(p),face=fu&&!FACE_BAD.has(fu)?`<img class="face pcf" src="${esc(fu)}" alt="">`:"";
+  let h=`<div class="pchd">${face}<div><h3 id="pcName">${p.num!==""?esc(p.num)+" ":""}${esc(pName(p))}</h3>
+    <div class="pct">${logo(T.apiId)}${esc(tName(T.apiId,T.name))}</div></div><button class="pcx" id="pcClose" aria-label="閉じる">×</button></div>`;
+  if(!T.apiId||p.apiId==null){$("pcBox").innerHTML=h+`<p class="empty">この試合(テスト用・手入力)には選手情報がありません。</p>`;return}
+  if(prof){const age=ageAt(prof.b,info.ko);
+    h+=`<dl class="pcprof">${prof.pos?`<dt>ポジション</dt><dd>${esc(POS_JA[prof.pos]||prof.pos)}</dd>`:""}
+      ${prof.b?`<dt>年齢</dt><dd>${age!=null?age+"歳":"–"}${info.ko?"(試合日時点)":""}・${esc(prof.b.replace(/-/g,"/"))}生</dd>`:""}
+      ${prof.n?`<dt>国籍</dt><dd>${esc(NAT_JA[prof.n]||prof.n)}</dd>`:""}
+      ${prof.h||prof.w?`<dt>身長・体重</dt><dd>${esc([prof.h,prof.w].filter(Boolean).join(" / "))}</dd>`:""}</dl>`}
+  if(statsSrc){const rows=statsSrc.st||[];
+    if(rows.length){const sum=rows.reduce((a,r)=>a.map((v,i)=>v+(+r[i+3]||0)),[0,0,0,0,0,0,0,0]);
+      const tr=(name,v,cls)=>`<tr${cls?` class="${cls}"`:""}><td>${esc(name)}</td><td>${v[0]}</td><td>${v[1]}</td><td>${v[2]}</td><td>${v[3]}</td><td>${v[4]}</td><td>${v[5]}</td><td>${v[6]+v[7]}</td></tr>`;
+      h+=`<div class="pcwrap"><table class="pcst"><thead><tr><th>大会</th><th>出場</th><th>先発</th><th>分</th><th>得点</th><th>アシスト</th><th>警告</th><th>退場</th></tr></thead><tbody>
+        ${rows.map(r=>tr(LG_NAME[r[0]]||r[1],r.slice(3))).join("")}${rows.length>1?tr("公式戦合計",sum,"tot"):""}</tbody></table></div>`}
+    else h+=`<p class="empty">この時点では今シーズンの公式戦の記録がありません。</p>`;
+    h+=`<p class="pcnote">${fmtAt(info.pre.at)} 時点の成績(この試合のキックオフ前に取得)。退場は2枚目の警告を含みます。</p>`;
+  }else if(info&&info.pre){h+=`<p class="empty">${fmtAt(info.pre.at)} 時点のデータにこの選手は入っていませんでした。</p>`}
+  else{h+=`<p class="empty">この試合のキックオフより前に取得した成績がありません。${info&&info.later?"(キックオフ後に取得したデータはネタバレになるため成績には使いません)":""}</p>`}
+  const after=info.ko&&Date.now()>=info.ko;
+  h+=`<div class="pcget"><button class="ghost" id="pcFetch"${PC_BUSY?" disabled":""}>${PC_BUSY?"取得しています…":esc(tName(T.apiId,T.name))+" の選手情報を取得"}</button>
+    <span class="pcnote" style="margin:0">API 2〜3回。${after?"この試合は始まっているため、取得した成績は次の試合から表示します(年齢・国籍などはすぐ表示)。":"キックオフ前なので、この試合で表示できます。"}</span>
+    ${PC_MSG?`<span class="fmsg${PC_ERR?" err":""}">${esc(PC_MSG)}</span>`:""}</div>`;
+  $("pcBox").innerHTML=h}
+async function fetchPinfo(t){const T=S.data.teams[t],season=seasonOf(S.data);if(!T.apiId||!season)return;
+  PC_BUSY=true;PC_MSG="";PC_ERR=false;renderPinfo();
+  try{const p={};let page=1,total=1;
+    do{const res=await api(`players?team=${T.apiId}&season=${season}&page=${page}`);
+      total=Math.min(res.paging&&res.paging.total||1,6);
+      res.forEach(x=>{const pl=x.player||{};if(pl.id==null)return;
+        const ss=(x.statistics||[]).filter(s=>s.league&&!/friendl/i.test(s.league.name||""));
+        const st=ss.map(s=>{const g=s.games||{},go=s.goals||{},c=s.cards||{};
+          return [s.league.id,s.league.name||"",s.team&&s.team.id||null,g.appearences??g.appearances??0,g.lineups||0,g.minutes||0,go.total||0,go.assists||0,c.yellow||0,c.yellowred||0,c.red||0]});
+        const ps=(x.statistics||[]).find(s=>s.games&&s.games.position);
+        p[pl.id]={b:pl.birth&&pl.birth.date||null,n:pl.nationality||null,h:pl.height||null,w:pl.weight||null,pos:ps?ps.games.position:null,st}});
+      page++}while(page<=total);
+    if(!Object.keys(p).length)throw new Error("選手情報がありませんでした(シーズン "+season+")");
+    const now=Date.now(),ko=kickoffOf(S.data);let list=piSnaps(T.apiId);const last=list[list.length-1];
+    /* a second fetch on the same side of this kickoff replaces the previous one */
+    if(last&&ko&&(last.at>=ko)===(now>=ko)&&last.season===season)list.pop();
+    list.push({at:now,season,p});list=list.slice(-PI_KEEP);
+    const idx=ls.get("tacboard.pinfoIdx",{});idx[T.apiId]=now;
+    Object.keys(idx).sort((a,b)=>idx[b]-idx[a]).slice(PI_TEAMS).forEach(k=>{ls.del(piKey(k));delete idx[k]});
+    try{localStorage.setItem(piKey(T.apiId),JSON.stringify(list))}catch(e){throw new Error("端末の保存容量が足りませんでした")}
+    ls.set("tacboard.pinfoIdx",idx);
+    PC_MSG=`${Object.keys(p).length} 人分を取得しました `+quotaText();
+  }catch(e){PC_MSG=e.message||"取得できませんでした";PC_ERR=true}
+  PC_BUSY=false;if(PC_PID)renderPinfo()}
+$("pcard").addEventListener("click",e=>{
+  if(e.target.id==="pcard"||e.target.closest("#pcClose")){closePinfo();return}
+  if(e.target.closest("#pcFetch")&&!PC_BUSY){const p=pmap()[PC_PID];if(p)fetchPinfo(PC_PID.startsWith("away")?"away":"home")}});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("pcard").hidden)closePinfo()});
+["benchH","benchA"].forEach(id=>$(id).addEventListener("click",e=>{const li=e.target.closest("[data-pinfo]");if(li)openPinfo(li.dataset.pinfo)}));
+
 /* ---------- saved matches: list, store, open, forget ---------- */
 const MAX_RECENT=40;
 const entryId=d=>d&&d.fixture?String(d.fixture)+(d.copy?"~"+d.copy:""):null;
@@ -1212,7 +1317,7 @@ $("fRecent").addEventListener("click",e=>{
 
 /* ---------- export / import of saved matches as a file (for the Files app / iCloud Drive) ---------- */
 const sameContent=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
+const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.kickoff;delete d.season;const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
 $("fxExport").onclick=async()=>{
   const rec=ls.get("tacboard.recent",[]);
   const items=rec.map(r=>{const data=ls.get("tacboard.match."+r.id,null);if(!data)return null;const shape=ls.get(matchKey(data),null);
