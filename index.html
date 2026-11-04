@@ -193,6 +193,11 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .plist li[data-pinfo],.pn{cursor:pointer}
 .infobtn{margin-top:2px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:1px 10px;font-size:12px;color:var(--muted)}
 .mcrow{display:flex;align-items:center;gap:8px}
+.injg{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:8px}
+.injg h3{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:4px}
+.injg .plist li{grid-template-columns:1fr auto}
+.tag.q{background:#fff3d6;color:#7a5200;border-color:#e6c36e}
+.tag.mf{background:#fde3df;color:#8a2a1e;border-color:#e7a79c}
 .mcrow img.face{width:36px;height:36px;margin:0;vertical-align:middle}
 .wx{font-size:14px}
 .jump{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:40;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
@@ -314,6 +319,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <section class="panel"><h2 id="benchHTitle">Home</h2><ul class="plist" id="benchH"></ul></section>
     <section class="panel"><h2 id="benchATitle">Away</h2><ul class="plist" id="benchA"></ul></section>
   </div>
+  <section class="panel" id="secInj"><h2>欠場・出場微妙</h2><div id="inj"></div></section>
 
   <details class="editor finder" id="finder">
     <summary>試合を探して読み込む<span class="safe">スコアや結果は表示しません</span></summary>
@@ -413,11 +419,11 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
   <div class="pcard" id="mcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-label="試合情報" id="mcBox"></div></div>
   <nav class="jump" aria-label="ページ内の移動"><div class="jmenu" id="jumpMenu" hidden>
     <button data-jump="top">スコア</button><button data-jump="secTime">時間</button><button data-jump="secBoard">盤面</button>
-    <button data-jump="secPoss">配置</button><button data-jump="secLog">出来事</button><button data-jump="secPlayers">選手一覧</button>
+    <button data-jump="secPoss">配置</button><button data-jump="secLog">出来事</button><button data-jump="secPlayers">選手一覧</button><button data-jump="secInj">欠場者</button>
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104164940">20261104164940</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104172402">20261104172402</span></p>
 </div>
 
 <script>
@@ -727,7 +733,7 @@ function render(){
       ${rows.map(r=>r.mk?markerHtml(r):`<div class="c h">${r.home.map(evHtml).join("")}</div><button class="tm" data-t="${esc(r.t)}" aria-label="${esc(r.label)}に移動">${esc(r.label)}</button><div class="c">${r.away.map(evHtml).join("")}</div>`).join("")}
     </div>`;
   }
-  renderTime();renderFmSelects();
+  renderTime();renderFmSelects();renderInj();
 }
 /* ---------- period markers and stats in 反映済みの出来事 ----------
    前半終了 shows once the board is in the 2nd half, 90分終了 / 延長終了 once it is in extra time / the shoot-out,
@@ -1073,6 +1079,8 @@ function missingNames(){
   if(S&&S.data)datas.push([S.data,""]);
   datas.forEach(([d,lg])=>["home","away"].forEach(s=>{const T=d.teams&&d.teams[s];if(!T||T.apiId==null)return;addT(T.apiId,T.name,lg);
     (T.players||[]).forEach(p=>{if(p.apiId==null||plJa(p)||players.has(p.apiId))return;players.set(p.apiId,{id:p.apiId,name:p.name,num:p.num,team:T.name,teamId:T.apiId})})}));
+  datas.forEach(([d])=>(d.inj&&d.inj.list||[]).forEach(x=>{const T=d.teams&&d.teams[x.t];if(x.id==null||players.has(x.id)||(NAMES.players&&NAMES.players[x.id]))return;
+    players.set(x.id,{id:x.id,name:x.name,num:"",team:T?T.name:"",teamId:T?T.apiId:""})}));
   const leagues=new Map(),coaches=new Map(),venues=new Map(),refs=new Map();
   const addL=(id,name)=>{if(id==null||!name||lgJa(id,name)||leagues.has(+id))return;leagues.set(+id,{id:+id,name})};
   datas.forEach(([d])=>{const i=d.info;if(i){if(i.lgId!=null&&!LG_NAME[i.lgId])addL(i.lgId,i.league);
@@ -1395,6 +1403,39 @@ async function fetchWeather(){const d=S.data,i=d.info,ko=kickoffOf(d);if(!i||!i.
 $("infoBtn").onclick=openMinfo;
 $("mcard").addEventListener("click",e=>{if(e.target.id==="mcard"||e.target.closest("#mcClose")){closeMinfo();return}
   if(e.target.closest("#mcFetch")&&!MC_BUSY)fetchFxInfo()});
+/* ---------- injuries / suspensions for this fixture (injuries?fixture=, 1 request, only on the button) ----------
+   It lists who will not (or may not) play, decided before kickoff, so it shows nothing about the match itself */
+const INJ_JA={"Missing Fixture":"欠場","Questionable":"出場微妙"};
+const REASON_JA={"Injury":"負傷","Knock":"打撲","Illness":"体調不良","Suspended":"出場停止","Yellow Cards":"累積警告で出場停止","Red Card":"退場による出場停止",
+  "Knee Injury":"膝の負傷","Hamstring Injury":"ハムストリングの負傷","Muscle Injury":"筋肉系の負傷","Ankle Injury":"足首の負傷","Calf Injury":"ふくらはぎの負傷","Thigh Injury":"太ももの負傷",
+  "Thigh Problems":"太ももの不調","Groin Injury":"鼠径部の負傷","Back Injury":"背中の負傷","Foot Injury":"足の負傷","Hip Injury":"股関節の負傷","Shoulder Injury":"肩の負傷","Head Injury":"頭部の負傷",
+  "Achilles Tendon Injury":"アキレス腱の負傷","Broken ankle":"足首の骨折","Broken Leg":"脚の骨折","Broken foot":"足の骨折","Concussion":"脳しんとう","Cruciate Ligament Injury":"十字靭帯の負傷",
+  "Ligament Injury":"靭帯の負傷","Muscle Strain":"肉離れ","Lack of fitness":"コンディション不良","Personal Reasons":"個人的な理由","Coach's decision":"監督の判断","Inactive":"不出場",
+  "International duty":"代表招集","Rest":"休養","Virus":"ウイルス感染","Surgery":"手術","Wrist Injury":"手首の負傷","Arm Injury":"腕の負傷","Face Injury":"顔の負傷","Abdominal Injury":"腹部の負傷",
+  "Rib Injury":"肋骨の負傷","Toe Injury":"つま先の負傷","Heel Injury":"かかとの負傷","Neck Injury":"首の負傷","Adductor Injury":"内転筋の負傷","Pelvis Injury":"骨盤の負傷","Not in squad":"メンバー外"};
+let INJ_BUSY=false,INJ_MSG="";
+function renderInj(){const d=S.data,T=d.teams,box=$("inj");if(!box)return;
+  if(!d.fixture){box.innerHTML=`<p class="empty">テスト用・手入力の試合には欠場者の情報がありません。</p>`;return}
+  let h="";const inj=d.inj;
+  if(inj){h+=`<div class="injg">${["home","away"].map(t=>{const l=inj.list.filter(x=>x.t===t);
+      return `<div><h3>${logo(T[t].apiId)}${esc(tName(T[t].apiId,T[t].name))}</h3>${l.length?`<ul class="plist">${l.map(x=>{const pl={apiId:x.id,name:x.name};
+        return `<li><span>${faceImg(pl)}${esc(pName(pl))}</span><span><span class="tag ${x.type==="Questionable"?"q":"mf"}">${esc(INJ_JA[x.type]||x.type||"")}</span> ${esc(REASON_JA[x.reason]||x.reason||"")}</span></li>`}).join("")}</ul>`:`<p class="empty">情報なし</p>`}</div>`}).join("")}</div>
+      <p class="pcnote">${fmtAt(inj.at)} 取得。試合前に発表された情報です(大会やチームによっては載らないことがあります)。</p>`}
+  else h+=`<p class="empty">まだ取得していません。</p>`;
+  h+=`<p class="stfoot"><button class="ghost" id="injFetch"${INJ_BUSY?" disabled":""}>${INJ_BUSY?"取得しています…":inj?"取り直す":"欠場者を取得"}</button><span>(API 1回)</span></p>`;
+  if(INJ_MSG)h+=`<p class="fmsg err">${esc(INJ_MSG)}</p>`;
+  box.innerHTML=h}
+async function fetchInj(){const d=S.data;if(!d.fixture||INJ_BUSY)return;INJ_BUSY=true;INJ_MSG="";renderInj();
+  try{const res=await api("injuries?fixture="+d.fixture);
+    const side=id=>id===d.teams.home.apiId?"home":id===d.teams.away.apiId?"away":null,list=[],seen=new Set();
+    res.forEach(r=>{const pl=r.player||{},t=side(r.team&&r.team.id);if(!t||pl.id==null||seen.has(pl.id))return;seen.add(pl.id);
+      list.push({t,id:pl.id,name:pl.name||"?",type:pl.type||"",reason:pl.reason||""})});
+    d.inj={at:Date.now(),list};keepStats();
+    if(!list.length)INJ_MSG="この試合の欠場者の情報はありませんでした";
+  }catch(e){INJ_MSG=e.message||"取得できませんでした"}
+  INJ_BUSY=false;renderInj()}
+$("inj").addEventListener("click",e=>{if(e.target.closest("#injFetch"))fetchInj()});
+
 /* ---------- jump menu (bottom right): scroll to a section, opening it if it is a <details> ---------- */
 $("jumpBtn").onclick=e=>{e.stopPropagation();const m=$("jumpMenu");m.hidden=!m.hidden;$("jumpBtn").setAttribute("aria-expanded",String(!m.hidden))};
 $("jumpMenu").addEventListener("click",e=>{const b=e.target.closest("[data-jump]");if(!b)return;const k=b.dataset.jump;$("jumpMenu").hidden=true;$("jumpBtn").setAttribute("aria-expanded","false");
@@ -1455,7 +1496,7 @@ $("fRecent").addEventListener("click",e=>{
 
 /* ---------- export / import of saved matches as a file (for the Files app / iCloud Drive) ---------- */
 const sameContent=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.kickoff;delete d.season;delete d.info;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach}})}const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
+const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.inj;delete d.kickoff;delete d.season;delete d.info;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach}})}const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
 $("fxExport").onclick=async()=>{
   const rec=ls.get("tacboard.recent",[]);
   const items=rec.map(r=>{const data=ls.get("tacboard.match."+r.id,null);if(!data)return null;const shape=ls.get(matchKey(data),null);
