@@ -437,7 +437,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105053627">20261105053627</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105054512">20261105054512</span></p>
 </div>
 
 <script>
@@ -816,6 +816,7 @@ function statsPanel(kind){const st=S.data.stats||{};let h="";
   }else{
     if(st.full)h+=teamStatsHtml(st.full);
     if(st.players)h+=`<h4>選手スタッツ</h4>`+playerStatsHtml(st.players);
+    if(st.players&&st.capInfo&&!st.capInfo.on)h+=`<p class="stfoot">この試合の応答にはキャプテンの印がありませんでした(captain の項目: ${st.capInfo.has?st.capInfo.has+"人分あり・すべて false":"なし"})</p>`;
   }
   if(STATS_MSG)h+=`<p class="fmsg err">${esc(STATS_MSG)}</p>`;
   if(S.data.fixture)h+=`<p class="stfoot"><button class="link" data-statsre="${kind}">取り直す</button><span>(API ${kind==="ht"?1:2}回)</span></p>`;
@@ -839,9 +840,11 @@ async function fetchStats(kind,force){const fx=S.data.fixture;if(!fx)return;cons
       if(!st.full)STATS_MSG="スタッツはまだありませんでした";
     }
     if(needP){const res=await api("fixtures/players?fixture="+fx),pm=S.data;
-      const side=id=>id===pm.teams.home.apiId?"home":id===pm.teams.away.apiId?"away":null,out={home:[],away:[]};
+      const side=id=>id===pm.teams.home.apiId?"home":id===pm.teams.away.apiId?"away":null,out={home:[],away:[]},ci={has:0,on:0};
       res.forEach(e=>{const sd=side(e.team&&e.team.id);if(!sd)return;
-        (e.players||[]).forEach(x=>{const s=(x.statistics||[])[0]||{},g=s.games||{},pe=s.penalty||{};if(!g.minutes)return;
+        (e.players||[]).forEach(x=>{const s=(x.statistics||[])[0]||{},g=s.games||{},pe=s.penalty||{};
+          /* how the response marks captains (checked on real matches: whether the field exists and how many are true) */
+          if("captain" in g)ci.has++;if(g.captain===true||g.captain==="true"||g.captain===1)ci.on++;if(!g.minutes)return;
           const app=pm.teams[sd].players.find(p=>p.apiId===x.player.id);
           const n=v=>v==null?null:v;
           out[sd].push({pid:app?app.id:null,name:x.player.name,min:g.minutes,rt:g.rating!=null?(+g.rating).toFixed(1):null,
@@ -850,7 +853,7 @@ async function fetchStats(kind,force){const fx=S.data.fixture;if(!fx)return;cons
             tk:n(s.tackles&&s.tackles.total),int:n(s.tackles&&s.tackles.interceptions),dw:n(s.duels&&s.duels.won),
             drb:n(s.dribbles&&s.dribbles.success),fd:n(s.fouls&&s.fouls.drawn),fc:n(s.fouls&&s.fouls.committed),sv:n(s.goals&&s.goals.saves),
             dt:n(s.duels&&s.duels.total),da:n(s.dribbles&&s.dribbles.attempts),off:n(s.offsides),pw:n(pe.won),pc:n(pe.commited??pe.committed),pm:n(pe.missed),
-            ps:n(pe.saved),gc:g.position==="G"?n(s.goals&&s.goals.conceded):null,...(g.captain?{cap:true}:{})})})});
+            ps:n(pe.saved),gc:g.position==="G"?n(s.goals&&s.goals.conceded):null,...(g.captain===true||g.captain==="true"||g.captain===1?{cap:true}:{})})})});st.capInfo=ci;
       st.players=out.home.length||out.away.length?out:null;if(!st.players)STATS_MSG="選手スタッツはまだありませんでした";
     }
     keepStats();
