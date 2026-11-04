@@ -212,6 +212,7 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .pchd{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .pchd img.pcf{width:84px;height:84px;flex:none;margin:0;border-radius:50%;object-fit:cover;object-position:top;background:var(--line)}
 .pchd h3{margin:0;font-size:18px;line-height:1.3}
+.pchd .pcid{font-size:11px;line-height:1.2;color:var(--muted);font-variant-numeric:tabular-nums;user-select:text;-webkit-user-select:text}
 .pchd .pct{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:4px}
 .pchd .pcx{margin-left:auto;align-self:flex-start;border:0;background:none;font-size:22px;line-height:1;padding:4px 8px;color:var(--muted)}
 .pcprof{display:grid;grid-template-columns:auto 1fr;gap:2px 12px;font-size:14px;margin:0 0 10px}
@@ -427,7 +428,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104222230">20261104222230</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104223225">20261104223225</span></p>
 </div>
 
 <script>
@@ -1274,9 +1275,11 @@ function renderPinfo(){const pm=pmap(),p=pm[PC_PID];if(!p){closePinfo();return}
   const info=piFor(t),prof=p.apiId!=null&&info?(info.last&&info.last.p[p.apiId])||(info.pre&&info.pre.p[p.apiId])||null:null;
   const src=p.apiId!=null&&info&&info.pre?info.pre.p[p.apiId]||null:null;
   const fu=faceUrl(p),face=fu&&!FACE_BAD.has(fu)?`<img class="face pcf" src="${esc(fu)}" alt="">`:"";
-  let h=`<div class="pchd">${face}<div><h3 id="pcName">${p.num!==""?esc(p.num)+" ":""}${esc(pName(p))}</h3>
+  const pid=T.apiId?`<div class="pcid">${p.apiId!=null?"ID "+esc(p.apiId):"ID なし"}</div>`:"";
+  let h=`<div class="pchd">${face}<div>${pid}<h3 id="pcName">${p.num!==""?esc(p.num)+" ":""}${esc(pName(p))}</h3>
     <div class="pct">${logo(T.apiId)}${esc(tName(T.apiId,T.name))}</div></div><button class="pcx" id="pcClose" aria-label="閉じる">×</button></div>`;
-  if(!T.apiId||p.apiId==null){$("pcBox").innerHTML=h+`<p class="empty">この試合(テスト用・手入力)には選手情報がありません。</p>`;return}
+  if(!T.apiId){$("pcBox").innerHTML=h+`<p class="empty">この試合(テスト用・手入力)には選手情報がありません。</p>`;return}
+  if(p.apiId==null){$("pcBox").innerHTML=h+`<p class="empty">API のデータにこの選手のIDが無いため、選手情報(成績・プロフィール)は取得できません。日本語名も登録できないので英語のまま表示します。</p>`;return}
   if(prof){const age=ageAt(prof.b,info.ko);
     h+=`<dl class="pcprof">${prof.pos?`<dt>ポジション</dt><dd>${esc(POS_JA[prof.pos]||prof.pos)}</dd>`:""}
       ${prof.b?`<dt>年齢</dt><dd>${age!=null?age+"歳":"–"}${info.ko?"(試合日時点)":""}・${esc(prof.b.replace(/-/g,"/"))}生</dd>`:""}
