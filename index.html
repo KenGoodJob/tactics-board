@@ -432,7 +432,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105014622">20261105014622</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105014847">20261105014847</span></p>
 </div>
 
 <script>
@@ -947,7 +947,7 @@ function tacSvg(){if(!TAC.on)return "";const b=TAC.ball||{x:52.5,y:34};
 /* guide lines, only while 戦術モード is on: thirds (x=35/70) and the five lanes (penalty-area and goal-area widths) */
 function tacGuide(){if(!TAC.on)return "";
   const v=[35,70].map(x=>`<line x1="${x}" y1="0" x2="${x}" y2="68"/>`).join(""),h=[13.84,24.84,43.16,54.16].map(y=>`<line x1="0" y1="${y}" x2="105" y2="${y}"/>`).join("");
-  return `<g class="tacg" pointer-events="none" stroke="#fff" stroke-opacity=".28" stroke-width=".3" stroke-dasharray="1.2 1">${v}${h}</g>`}
+  return `<g class="tacg" pointer-events="none" stroke="#fff" stroke-opacity=".3" stroke-width=".15">${v}${h}</g>`}
 function tacUi(){const b=$("tacBtn");b.setAttribute("aria-pressed",TAC.on);b.textContent=TAC.on?"戦術モード オン":"戦術モード";
   const u=$("tacUndo");u.hidden=!TAC.on;u.disabled=!TAC.lines.length}
 $("tacBtn").addEventListener("click",()=>{TAC.on=!TAC.on;TAC.lines=[];TAC.ball=TAC.on?{x:52.5,y:34}:null;tdraw=null;render()});
