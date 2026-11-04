@@ -299,7 +299,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <div class="status" id="status"></div>
   </section>
 
-  <div class="boardbox" id="secBoard"><div class="tacbar"><button class="tacbtn" id="tacUndo" hidden>1本戻す</button><button class="tacbtn" id="tacBtn" aria-pressed="false">戦術モード</button></div><svg id="board" viewBox="-4 -6 113 94" aria-label="戦術ボード"></svg></div>
+  <div class="boardbox" id="secBoard"><div class="tacbar"><button class="tacbtn" id="tacUndo" hidden>1つ戻す</button><button class="tacbtn" id="tacBtn" aria-pressed="false">戦術モード</button></div><svg id="board" viewBox="-4 -6 113 94" aria-label="戦術ボード"></svg></div>
 
   <div class="possbar" id="secPoss">
     <span class="plabel">配置パターン</span>
@@ -432,7 +432,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105015320">20261105015320</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105015554">20261105015554</span></p>
 </div>
 
 <script>
@@ -901,7 +901,7 @@ function renderFmSelects(){
 /* ---------- time controls ---------- */
 $("steps").addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;step(+b.dataset.step);renderTime();save()});
 $("segChips").addEventListener("click",e=>{const b=e.target.closest("[data-seg]");if(!b)return;jump(b.dataset.seg);renderTime();save()});
-$("tnow").onclick=()=>{S.applied=norm(S.pending);BENCH_POS={};save();render()};
+$("tnow").onclick=()=>{S.applied=norm(S.pending);BENCH_POS={};undoClear();save();render()};
 /* tapping a time in 反映済みの出来事 moves the clock back there and applies it (already seen, so nothing new is revealed) */
 $("log").addEventListener("click",e=>{
   const pi=e.target.closest("[data-pinfo]");if(pi){openPinfo(pi.dataset.pinfo);return}
@@ -910,17 +910,17 @@ $("log").addEventListener("click",e=>{
   const tb=e.target.closest("[data-psteam]");if(tb){PS_TEAM=tb.dataset.psteam;render();return}
   const so=e.target.closest("[data-pssort]");if(so){PS_SORT=so.dataset.pssort;render();return}
   const b=e.target.closest("button.tm[data-t]");if(!b)return;
-  const [seg,min,add]=b.dataset.t.split("|");S.pending=S.applied=norm({seg,min:+min,add:+add});BENCH_POS={};save();render()});
+  const [seg,min,add]=b.dataset.t.split("|");S.pending=S.applied=norm({seg,min:+min,add:+add});BENCH_POS={};undoClear();save();render()});
 
 /* ---------- formation & reset ---------- */
 $("possSeg").addEventListener("click",e=>{const b=e.target.closest("[data-poss]");if(!b)return;
-  S.poss=b.dataset.poss;tmsg.home=tmsg.away="";save();render()});
+  S.poss=b.dataset.poss;tmsg.home=tmsg.away="";undoClear();save();render()});
 document.querySelector(".tctrls").addEventListener("change",e=>{
   const sel=e.target.closest("select[data-m]");if(!sel)return;const t=sel.closest(".tctrl").dataset.team,m=sel.dataset.m;
-  const sh=shapeOf(t,m);sh.fm=sel.value===S.data.teams[t].formation?null:sel.value;sh.pos=null;sh.work={};
+  const sh=shapeOf(t,m);sh.fm=sel.value===S.data.teams[t].formation?null:sel.value;sh.pos=null;sh.work={};undoClear();
   tmsg[t]=`${MODE_NAME[m]}のシステムを ${sel.value} にしました`;save();keepShapes();render()});
 document.querySelector(".tctrls").addEventListener("click",e=>{
-  const b=e.target.closest("[data-act]");if(!b)return;const t=b.closest(".tctrl").dataset.team,m=modeOf(t),sh=shapeOf(t,m);
+  const b=e.target.closest("[data-act]");if(!b)return;const t=b.closest(".tctrl").dataset.team,m=modeOf(t),sh=shapeOf(t,m);undoClear();
   if(b.dataset.act==="flip"){flipTeam(t);tmsg[t]="スタメンの左右を反転しました(保存した配置はリセット)";save();keepShapes();render();renderEditor();return}
   if(b.dataset.act==="save"){sh.pos=Array.from({length:11},(_,s)=>({...slotPos(t,s,m)}));sh.work={};tmsg[t]=`${MODE_NAME[m]}の配置を保存しました`}
   if(b.dataset.act==="reset"){sh.work={};tmsg[t]=sh.pos||sh.fm?`保存した${MODE_NAME[m]}の配置に戻しました`:`${MODE_NAME[m]}は保存がないので、最初の配置に戻しました`}
@@ -931,7 +931,7 @@ $("autoEnds").onchange=e=>{S.autoEnds=e.target.checked;save();render()};
 $("swapEnds").onclick=()=>{S.endSwap=!S.endSwap;save();render()};
 $("showFaces").checked=facesOn();$("showFaces").onchange=e=>{try{localStorage.setItem("tacboard.faces",String(e.target.checked))}catch(x){}render()};
 $("showMarks").checked=marksOn();$("showMarks").onchange=e=>{try{localStorage.setItem("tacboard.marks",String(e.target.checked))}catch(x){}render()};
-$("resetAll").onclick=()=>{["home","away"].forEach(t=>{MODES.forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});BENCH_POS={};save();render()};
+$("resetAll").onclick=()=>{["home","away"].forEach(t=>{MODES.forEach(m=>S.shapes[t][m].work={});tmsg[t]=""});BENCH_POS={};undoClear();save();render()};
 /* bench discs of one team go back to their default place */
 function resetBench(t){players(t).forEach(p=>delete BENCH_POS[p.id])}
 
@@ -940,6 +940,16 @@ const svg=$("board");let drag=null;
 function svgPt(ev){const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;return pt.matrixTransform(svg.getScreenCTM().inverse())}
 /* ---------- 戦術モード: a movable ball and thick freehand lines. Screen coordinates, kept only in memory; turning it off clears everything ---------- */
 const TAC={on:false,ball:null,lines:[]},TAC_COLOR="#ffd21f",TAC_W=1.1;let tdraw=null;
+/* 1つ戻す: lines, ball moves and player / bench drags, newest first. Cleared when positions are reset wholesale (更新, time tap, pattern / system / team buttons, loading a match) */
+const UNDO=[];
+function undoPush(a){UNDO.push(a);if(UNDO.length>100)UNDO.shift()}
+function undoClear(){UNDO.length=0}
+function undoOne(){const a=UNDO.pop();if(!a)return;
+  if(a.k==="line")TAC.lines.pop();
+  else if(a.k==="ball")TAC.ball=a.prev;
+  else if(a.k==="pl"){const w=S.shapes[a.t][a.m].work;if(a.prev)w[a.slot]=a.prev;else delete w[a.slot];save()}
+  else if(a.k==="bench"){if(a.prev)BENCH_POS[a.id]=a.prev;else delete BENCH_POS[a.id]}
+  render()}
 const tacPath=pts=>"M"+pts.map(p=>p.x.toFixed(2)+" "+p.y.toFixed(2)).join("L")+(pts.length===1?"l0 0":"");
 function tacSvg(){if(!TAC.on)return "";const b=TAC.ball||{x:52.5,y:34};
   return `<g class="tacl" pointer-events="none" fill="none" stroke="${TAC_COLOR}" stroke-width="${TAC_W}" stroke-linecap="round" stroke-linejoin="round" opacity=".9">${TAC.lines.map(l=>`<path d="${tacPath(l)}"/>`).join("")}</g>`+
@@ -949,9 +959,10 @@ function tacGuide(){if(!TAC.on)return "";
   const v=[35,70].map(x=>`<line x1="${x}" y1="0" x2="${x}" y2="68"/>`).join(""),h=[13.84,24.84,43.16,54.16].map(y=>`<line x1="0" y1="${y}" x2="105" y2="${y}"/>`).join("");
   return `<g class="tacg" pointer-events="none" stroke="#fff" stroke-opacity=".3" stroke-width=".15">${v}${h}</g>`}
 function tacUi(){const b=$("tacBtn");b.setAttribute("aria-pressed",TAC.on);b.textContent=TAC.on?"戦術モード オン":"戦術モード";
-  const u=$("tacUndo");u.hidden=!TAC.on;u.disabled=!TAC.lines.length}
-$("tacBtn").addEventListener("click",()=>{TAC.on=!TAC.on;TAC.lines=[];TAC.ball=TAC.on?{x:52.5,y:34}:null;tdraw=null;render()});
-$("tacUndo").addEventListener("click",()=>{TAC.lines.pop();render()});
+  const u=$("tacUndo");u.hidden=!TAC.on&&!UNDO.length;u.disabled=!UNDO.length}
+$("tacBtn").addEventListener("click",()=>{TAC.on=!TAC.on;TAC.lines=[];TAC.ball=TAC.on?{x:52.5,y:34}:null;tdraw=null;
+  for(let i=UNDO.length-1;i>=0;i--)if(UNDO[i].k==="line"||UNDO[i].k==="ball")UNDO.splice(i,1);render()});
+$("tacUndo").addEventListener("click",undoOne);
 svg.addEventListener("pointerdown",ev=>{
   if(drag||tdraw)return;
   const g=ev.target.closest(".pl")||(TAC.on?ev.target.closest(".tball"):null);
@@ -972,12 +983,13 @@ svg.addEventListener("pointermove",ev=>{
   drag.x=Math.max(-2,Math.min(107,p.x+drag.dx));drag.y=Math.max(-3,Math.min(drag.ymax,p.y+drag.dy));
   drag.g.setAttribute("transform",`translate(${drag.x.toFixed(2)} ${drag.y.toFixed(2)})${drag.suf}`)});
 function endDrag(ev){
-  if(tdraw){if(ev&&ev.pointerId!==tdraw.id)return;TAC.lines.push(tdraw.pts);tdraw=null;tacUi();return}
+  if(tdraw){if(ev&&ev.pointerId!==tdraw.id)return;TAC.lines.push(tdraw.pts);undoPush({k:"line"});tdraw=null;tacUi();return}
   if(!drag)return;const g=drag.g;
-  if(drag.ball){if(drag.moved)TAC.ball={x:drag.x,y:drag.y};g.classList.remove("dragging");g.style.cursor="grab";drag=null;return}
+  if(drag.ball){if(drag.moved){undoPush({k:"ball",prev:TAC.ball});TAC.ball={x:drag.x,y:drag.y};tacUi()}g.classList.remove("dragging");g.style.cursor="grab";drag=null;return}
   if(!drag.moved){g.classList.remove("dragging");g.style.cursor="grab";drag=null;if(ev&&ev.type==="pointerup")openPinfo(g.dataset.pid);return}
-  if(g.dataset.bench)BENCH_POS[g.dataset.bench]={x:drag.x,y:drag.y};else shapeOf(g.dataset.team).work[g.dataset.slot]=endView({x:drag.x,y:drag.y});
-  g.classList.remove("dragging");g.style.cursor="grab";drag=null;save()}
+  if(g.dataset.bench){const id=g.dataset.bench;undoPush({k:"bench",id,prev:BENCH_POS[id]});BENCH_POS[id]={x:drag.x,y:drag.y}}
+  else{const t=g.dataset.team,m=modeOf(t),slot=g.dataset.slot,w=shapeOf(t,m).work;undoPush({k:"pl",t,m,slot,prev:w[slot]});w[slot]=endView({x:drag.x,y:drag.y})}
+  g.classList.remove("dragging");g.style.cursor="grab";drag=null;save();tacUi()}
 svg.addEventListener("pointerup",endDrag);svg.addEventListener("pointercancel",endDrag);
 
 /* ---------- editor ---------- */
@@ -1054,14 +1066,14 @@ $("importBtn").onclick=()=>{try{const d=JSON.parse($("json").value);
   }catch(err){$("jsonMsg").textContent="読み込めませんでした。書き出したときの形式のJSONを貼り付けてください"}};
 $("testSel").innerHTML=TESTS.map(([k,l])=>`<option value="${k}">${esc(l)}</option>`).join("");
 $("testOpen").onclick=()=>{const t=TESTS.find(x=>x[0]===$("testSel").value);if(!t)return;start(t[2]());rememberLast(null);
-  STATS_OPEN.ht=STATS_OPEN.ft=false;BENCH_POS={};save();renderEditor();render();closeFinder()};
+  STATS_OPEN.ht=STATS_OPEN.ft=false;BENCH_POS={};undoClear();save();renderEditor();render();closeFinder()};
 $("sampleBtn").onclick=()=>{start(clone(SAMPLE));rememberLast(null);save();renderEditor();render();$("jsonMsg").textContent="サンプル試合に戻しました"};
 
 /* ---------- left/right flip for starters ---------- */
 function flipTeam(t){
   const T=S.data.teams[t],st=T.players.filter(p=>p.starter),bn=T.players.filter(p=>!p.starter);
   const out=[st[0]];let i=1;parseFm(T.formation).forEach(k=>{out.push(...st.slice(i,i+k).reverse());i+=k});out.push(...st.slice(i));
-  T.players=[...out.filter(Boolean),...bn];MODES.forEach(m=>{S.shapes[t][m].pos=null;S.shapes[t][m].work={}});
+  T.players=[...out.filter(Boolean),...bn];MODES.forEach(m=>{S.shapes[t][m].pos=null;S.shapes[t][m].work={}});undoClear();
   S.flip=S.flip||{};S.flip[t]=!S.flip[t];
 }
 function loadMatch(data){start(data);rememberLast(data);save();renderEditor();render()}
