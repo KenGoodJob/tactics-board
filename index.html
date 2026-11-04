@@ -84,7 +84,10 @@ img.face{width:24px;height:24px;border-radius:50%;object-fit:cover;object-positi
 
 /* board */
 .boardbox{position:relative;background:var(--board-edge);border-radius:12px;padding:10px;overflow:hidden}
-.tacbar{position:absolute;top:6px;right:6px;display:flex;gap:6px;z-index:2}
+.tacbar{position:absolute;top:6px;right:6px;display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px;z-index:2;max-width:calc(100% - 12px)}
+.tacbtn.rec{border-color:#ff6b5e}.tacbtn.rec[aria-pressed="true"]{background:#e2463a;border-color:#e2463a;color:#fff}
+.taccount{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:72px;font-weight:700;color:#fff;text-shadow:0 2px 12px rgba(0,0,0,.6);pointer-events:none;z-index:3}
+.taccount[hidden]{display:none}
 .tacbtn{font:inherit;font-size:12px;line-height:1.2;padding:5px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.55);background:rgba(0,0,0,.45);color:#fff;cursor:pointer;touch-action:manipulation}
 .tacbtn[aria-pressed="true"]{background:#ffd21f;border-color:#ffd21f;color:#111;font-weight:600}
 .tacbtn:disabled{opacity:.4;cursor:default}
@@ -304,7 +307,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <div class="status" id="status"></div>
   </section>
 
-  <div class="boardbox" id="secBoard"><div class="tacbar"><button class="tacbtn" id="tacUndo" hidden>1つ戻す</button><button class="tacbtn" id="tacBtn" aria-pressed="false">戦術モード</button></div><svg id="board" viewBox="-4 -6 113 94" aria-label="戦術ボード"></svg></div>
+  <div class="boardbox" id="secBoard"><div class="tacbar"><button class="tacbtn rec" id="tacRec" hidden aria-pressed="false">● 記録</button><button class="tacbtn" id="tacPlay" hidden aria-pressed="false">▶ 再生</button><button class="tacbtn" id="tacDel" hidden>1本消す</button><button class="tacbtn" id="tacUndo" hidden>1つ戻す</button><button class="tacbtn" id="tacBtn" aria-pressed="false">戦術モード</button></div><div class="taccount" id="tacCount" hidden></div><svg id="board" viewBox="-4 -6 113 94" aria-label="戦術ボード"></svg></div>
 
   <div class="possbar" id="secPoss">
     <span class="plabel">配置パターン</span>
@@ -437,7 +440,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105054940">20261105054940</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105061247">20261105061247</span></p>
 </div>
 
 <script>
@@ -976,9 +979,9 @@ function svgPt(ev){const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY
 /* ---------- 戦術モード: a movable ball and thick freehand lines. Screen coordinates, kept only in memory; turning it off clears everything ---------- */
 const TAC={on:false,ball:null,lines:[]},TAC_COLOR="#ffd21f",TAC_W=1.1;let tdraw=null;
 /* 1つ戻す: lines, ball moves and player / bench drags, newest first. Cleared when positions are reset wholesale (更新, time tap, pattern / system / team buttons, loading a match) */
-const UNDO=[];
+const UNDO=[],TAKES=[],RP={st:null,t0:0,cur:null,seg:null,segs:null,base:null,els:{},raf:0,timer:0,end:0};
 function undoPush(a){UNDO.push(a);if(UNDO.length>100)UNDO.shift()}
-function undoClear(){UNDO.length=0}
+function undoClear(){UNDO.length=0;recClear()}
 function undoOne(){const a=UNDO.pop();if(!a)return;
   if(a.k==="line")TAC.lines.pop();
   else if(a.k==="ball")TAC.ball=a.prev;
@@ -994,14 +997,73 @@ function tacGuide(){if(!TAC.on)return "";
   const v=[35,70].map(x=>`<line x1="${x}" y1="0" x2="${x}" y2="68"/>`).join(""),h=[13.84,24.84,43.16,54.16].map(y=>`<line x1="0" y1="${y}" x2="105" y2="${y}"/>`).join("");
   return `<g class="tacg" pointer-events="none" stroke="#fff" stroke-opacity=".3" stroke-width=".15">${v}${h}</g>`}
 function tacUi(){const b=$("tacBtn");b.setAttribute("aria-pressed",TAC.on);b.textContent=TAC.on?"戦術モード オン":"戦術モード";
-  const u=$("tacUndo");u.hidden=!TAC.on&&!UNDO.length;u.disabled=!UNDO.length}
-$("tacBtn").addEventListener("click",()=>{TAC.on=!TAC.on;TAC.lines=[];TAC.ball=TAC.on?{x:52.5,y:34}:null;tdraw=null;
+  const u=$("tacUndo");u.hidden=!TAC.on&&!UNDO.length;u.disabled=!UNDO.length||!!RP.st;recUi()}
+$("tacBtn").addEventListener("click",()=>{recClear();TAC.on=!TAC.on;TAC.lines=[];TAC.ball=TAC.on?{x:52.5,y:34}:null;tdraw=null;
   for(let i=UNDO.length-1;i>=0;i--)if(UNDO[i].k==="line"||UNDO[i].k==="ball")UNDO.splice(i,1);render()});
 $("tacUndo").addEventListener("click",undoOne);
+/* 再生モード: record one object at a time (the takes recorded so far play while recording), then play every take together.
+   Kept in memory in screen coordinates like the lines; recording drags are not saved as positions.
+   A take = list of segments {key, pts:[{t,x,y}]} (t = ms from the take's start). key: "ball" / "s:<team>:<slot>" / "b:<bench id>" */
+const REC_MAX=90000;
+function objKey(g){return g.classList.contains("tball")?"ball":g.dataset.bench?"b:"+g.dataset.bench:"s:"+g.dataset.team+":"+g.dataset.slot}
+function objEl(k){let e=RP.els[k];if(e&&e.isConnected)return e;
+  e=k==="ball"?svg.querySelector(".tball"):k.startsWith("b:")?[...svg.querySelectorAll(".pl[data-bench]")].find(x=>x.dataset.bench===k.slice(2)):svg.querySelector(`.pl[data-team="${k.split(":")[1]}"][data-slot="${k.split(":")[2]}"]`);
+  return RP.els[k]=e||null}
+function objPos(e){const m=/translate\(([-\d.]+) ([-\d.]+)\)/.exec(e.getAttribute("transform")||"");return m?{x:+m[1],y:+m[2]}:null}
+function objSet(e,x,y){const sc=+e.dataset.sc||1;e.setAttribute("transform",`translate(${x.toFixed(2)} ${y.toFixed(2)})${sc!==1?` scale(${sc})`:""}`)}
+/* segments of every take (plus the finished segments of the take being recorded), grouped by object */
+function recSegs(){const m={};const add=(tk,i)=>tk.segs.forEach(sg=>{if(sg.pts.length)(m[sg.key]=m[sg.key]||[]).push({i,pts:sg.pts,s:sg.pts[0].t,e:sg.pts[sg.pts.length-1].t})});
+  TAKES.forEach(add);if(RP.cur)add(RP.cur,TAKES.length);return m}
+/* where an object is at time t: inside a segment → interpolate (a later take wins); after its segments → where the last one ended; before → its start place */
+function posAt(list,t,base){let a=null;for(const sg of list)if(t>=sg.s&&t<=sg.e&&(!a||sg.i>=a.i))a=sg;
+  if(a){const P=a.pts;let lo=0,hi=P.length-1;while(hi-lo>1){const md=(lo+hi)>>1;if(P[md].t<=t)lo=md;else hi=md}
+    const p=P[lo],q=P[hi],f=q.t>p.t?Math.min(1,Math.max(0,(t-p.t)/(q.t-p.t))):1;return {x:p.x+(q.x-p.x)*f,y:p.y+(q.y-p.y)*f}}
+  let l=null;for(const sg of list)if(sg.e<t&&(!l||sg.e>l.e||(sg.e===l.e&&sg.i>l.i)))l=sg;
+  return l?l.pts[l.pts.length-1]:base}
+function recFrame(now){if(!RP.st||RP.st==="count")return;const t=now-RP.t0,segs=RP.segs,hold=RP.seg&&RP.seg.key;
+  for(const k in segs){if(k===hold)continue;const e=objEl(k);if(!e)continue;
+    if(!(k in RP.base))RP.base[k]=objPos(e);const p=posAt(segs[k],t,RP.base[k]);if(p)objSet(e,p.x,p.y)}
+  if(RP.st==="play"&&t>RP.end+150){recStop();return}
+  if(RP.st==="rec"&&t>REC_MAX){recStop();return}
+  RP.raf=requestAnimationFrame(recFrame)}
+/* every object back to its place on the board, and remember those places as the start of the scene */
+function recReset(){if(drag){drag.g.classList.remove("dragging");drag=null}render();RP.els={};RP.base={};
+  const segs=recSegs();for(const k in segs){const e=objEl(k);if(e)RP.base[k]=objPos(e)}RP.segs=segs}
+function recStart(){if(RP.st)return;recReset();RP.cur={segs:[]};RP.st="count";let n=3;const c=$("tacCount");c.hidden=false;c.textContent=n;recUi();
+  const tick=()=>{if(RP.st!=="count")return;n--;if(n>0){c.textContent=n;RP.timer=setTimeout(tick,700);return}
+    c.hidden=true;RP.st="rec";RP.t0=performance.now();recUi();RP.raf=requestAnimationFrame(recFrame)};
+  RP.timer=setTimeout(tick,700)}
+function recPlay(){if(RP.st||!TAKES.length)return;recReset();
+  RP.end=0;for(const k in RP.segs)RP.segs[k].forEach(sg=>{if(sg.e>RP.end)RP.end=sg.e});
+  RP.st="play";RP.t0=performance.now();recUi();RP.raf=requestAnimationFrame(recFrame)}
+/* stop recording / playing. Objects stay where they ended until the next render */
+function recStop(){clearTimeout(RP.timer);cancelAnimationFrame(RP.raf);$("tacCount").hidden=true;
+  if(RP.st==="rec"||RP.st==="count"){if(drag&&drag.rec){drag.g.classList.remove("dragging");recRelease();drag=null}
+    if(RP.cur&&RP.cur.segs.length)TAKES.push(RP.cur)}
+  RP.st=null;RP.cur=null;RP.seg=null;tacUi()}
+function recClear(){const was=RP.st||TAKES.length;if(RP.st){RP.cur=null;recStop()}TAKES.length=0;if(was)recUi()}
+/* while recording: a grab starts a segment at the object's current place (it may be moving in an earlier take) */
+function recGrab(g){const k=objKey(g),p=objPos(g),t=performance.now()-RP.t0;drag.moved=true;
+  RP.seg={key:k,pts:[{t,x:p.x,y:p.y}]};drag.rec=RP.seg;RP.els[k]=g;if(!(k in RP.base))RP.base[k]=p}
+/* a finger that rests sends no moves; keep the resting place up to just before the next move so playback does not glide */
+function recPt(sg,x,y){const t=performance.now()-RP.t0,P=sg.pts,l=P[P.length-1];
+  if(t-l.t>50)P.push({t:t-16,x:l.x,y:l.y});P.push({t,x,y})}
+function recRelease(){const sg=RP.seg;if(!sg)return;const t=performance.now()-RP.t0,l=sg.pts[sg.pts.length-1];
+  if(t>l.t)sg.pts.push({t,x:l.x,y:l.y});RP.cur.segs.push(sg);RP.seg=null;RP.segs=recSegs()}
+function recUi(){const on=TAC.on,r=$("tacRec"),p=$("tacPlay"),d=$("tacDel");
+  r.hidden=p.hidden=d.hidden=!on;
+  const rec=RP.st==="rec"||RP.st==="count",play=RP.st==="play";
+  r.textContent=rec?"■ 記録を止める":"● 記録"+(TAKES.length?` ${TAKES.length+1}本目`:"");r.setAttribute("aria-pressed",rec);r.disabled=play;
+  p.textContent=play?"■ 止める":"▶ 再生"+(TAKES.length?`(${TAKES.length}本)`:"");p.setAttribute("aria-pressed",play);p.disabled=rec||!TAKES.length;
+  d.disabled=!!RP.st||!TAKES.length}
+$("tacRec").addEventListener("click",()=>{if(RP.st==="rec"||RP.st==="count")recStop();else recStart()});
+$("tacPlay").addEventListener("click",()=>{if(RP.st==="play")recStop();else recPlay()});
+$("tacDel").addEventListener("click",()=>{if(RP.st||!TAKES.length)return;TAKES.pop();render()});
 svg.addEventListener("pointerdown",ev=>{
   if(drag||tdraw)return;
+  if(RP.st&&RP.st!=="rec"){ev.preventDefault();return}
   const g=ev.target.closest(".pl")||(TAC.on?ev.target.closest(".tball"):null);
-  if(!g){if(!TAC.on)return;ev.preventDefault();const layer=svg.querySelector(".tacl");if(!layer)return;
+  if(!g){if(!TAC.on||RP.st)return;ev.preventDefault();const layer=svg.querySelector(".tacl");if(!layer)return;
     const p=svgPt(ev),el=document.createElementNS("http://www.w3.org/2000/svg","path");layer.appendChild(el);
     tdraw={pts:[{x:p.x,y:p.y}],el,id:ev.pointerId};el.setAttribute("d",tacPath(tdraw.pts));
     try{svg.setPointerCapture(ev.pointerId)}catch(e){}return}
@@ -1010,16 +1072,19 @@ svg.addEventListener("pointerdown",ev=>{
   const sc=+g.dataset.sc||1;
   drag={g,ball:g.classList.contains("tball"),cx:ev.clientX,cy:ev.clientY,moved:false,dx:+m[1]-p.x,dy:+m[2]-p.y,x:+m[1],y:+m[2],suf:sc!==1?` scale(${sc})`:"",ymax:benchBottom(benchRows())+2};g.classList.add("dragging");g.style.cursor="grabbing";
   if(!drag.ball)svg.appendChild(g);try{svg.setPointerCapture(ev.pointerId)}catch(e){}
+  if(RP.st==="rec")recGrab(g);
 });
 svg.addEventListener("pointermove",ev=>{
   if(tdraw){if(ev.pointerId!==tdraw.id)return;const p=svgPt(ev),q=tdraw.pts[tdraw.pts.length-1];
     if(Math.hypot(p.x-q.x,p.y-q.y)<.4)return;tdraw.pts.push({x:p.x,y:p.y});tdraw.el.setAttribute("d",tacPath(tdraw.pts));return}
-  if(!drag)return;if(!drag.moved&&Math.hypot(ev.clientX-drag.cx,ev.clientY-drag.cy)<8)return;drag.moved=true;const p=svgPt(ev);
+  if(!drag)return;if(!drag.rec&&!drag.moved&&Math.hypot(ev.clientX-drag.cx,ev.clientY-drag.cy)<8)return;drag.moved=true;const p=svgPt(ev);
   drag.x=Math.max(-2,Math.min(107,p.x+drag.dx));drag.y=Math.max(-3,Math.min(drag.ymax,p.y+drag.dy));
-  drag.g.setAttribute("transform",`translate(${drag.x.toFixed(2)} ${drag.y.toFixed(2)})${drag.suf}`)});
+  drag.g.setAttribute("transform",`translate(${drag.x.toFixed(2)} ${drag.y.toFixed(2)})${drag.suf}`);
+  if(drag.rec)recPt(drag.rec,drag.x,drag.y)});
 function endDrag(ev){
   if(tdraw){if(ev&&ev.pointerId!==tdraw.id)return;TAC.lines.push(tdraw.pts);undoPush({k:"line"});tdraw=null;tacUi();return}
   if(!drag)return;const g=drag.g;
+  if(drag.rec){recRelease();g.classList.remove("dragging");g.style.cursor="grab";drag=null;return}
   if(drag.ball){if(drag.moved){undoPush({k:"ball",prev:TAC.ball});TAC.ball={x:drag.x,y:drag.y};tacUi()}g.classList.remove("dragging");g.style.cursor="grab";drag=null;return}
   if(!drag.moved){g.classList.remove("dragging");g.style.cursor="grab";drag=null;if(ev&&ev.type==="pointerup")openPinfo(g.dataset.pid);return}
   if(g.dataset.bench){const id=g.dataset.bench;undoPush({k:"bench",id,prev:BENCH_POS[id]});BENCH_POS[id]={x:drag.x,y:drag.y}}
