@@ -141,7 +141,8 @@
   "556": ["カラバフ", "Qarabag"],
   "651": ["フェレンツヴァーロシュ", "Ferencvaros"],
   "656": ["スロヴァン・ブラチスラヴァ", "Slovan"],
-  "1026": ["LASKリンツ", "Lask"]
+  "1026": ["LASKリンツ", "Lask"],
+  "770": ["チェコ", "Czech"]
 },
 "players": {
   "269349": ["ルカーシュ・ホルニーチェク", "L. Horníček"],
@@ -211,12 +212,19 @@
   "179": ["スコティッシュ・プレミアシップ", "Premiership"],
   "203": ["スュペル・リグ", "Super Lig"],
   "253": ["MLS", "Major League Soccer"],
-  "98": ["J1リーグ", "J1 League"]
+  "98": ["J1リーグ", "J1 League"],
+  "97": ["タッサ・ダ・リーガ", "Taca da Liga"],
+  "96": ["タッサ・デ・ポルトガル", "Taca de Portugal"],
+  "32": ["W杯欧州予選", "World Cup - Qualification Europe"]
 },
 "coaches": {
+  "13959": ["マティアス・ヤイスレ", "M. Jaissle"],
+  "5662": ["デイヴィッド・モイーズ", "D. Moyes"]
 },
 "venues": {
+  "St James' Park": ["セント・ジェームズ・パーク", "St James' Park", "ニューカッスル"]
 },
 "referees": {
+  "John Brooks": ["ジョン・ブルックス"]
 }
 }
