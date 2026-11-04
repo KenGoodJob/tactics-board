@@ -428,7 +428,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104223225">20261104223225</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104224426">20261104224426</span></p>
 </div>
 
 <script>
@@ -1522,43 +1522,69 @@ $("fRecent").addEventListener("click",e=>{
 /* ---------- export / import of saved matches as a file (for the Files app / iCloud Drive) ---------- */
 const sameContent=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.inj;delete d.kickoff;delete d.season;delete d.info;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach}})}const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
+const pc=o=>{const n=Object.keys(o).length;return n?`と ${n} チームの選手情報`:""};
+/* fill what the saved copy lacks from an imported copy of the same match (injuries, stats, match info, coaches, kickoff, season) */
+function fillExtras(d,src){let ch=false;const has=v=>v!=null&&!(typeof v==="object"&&!Object.keys(v).length);
+  ["kickoff","season"].forEach(k=>{if(!has(d[k])&&has(src[k])){d[k]=src[k];ch=true}});
+  if(has(src.info)){if(!has(d.info)){d.info=src.info;ch=true}else Object.keys(src.info).forEach(k=>{if(!has(d.info[k])&&has(src.info[k])){d.info[k]=src.info[k];ch=true}})}
+  if(src.inj&&(!d.inj||(src.inj.at||0)>(d.inj.at||0))){d.inj=src.inj;ch=true}
+  if(has(src.stats)){if(!has(d.stats)){d.stats=src.stats;ch=true}else Object.keys(src.stats).forEach(k=>{if(!has(d.stats[k])&&has(src.stats[k])){d.stats[k]=src.stats[k];ch=true}})}
+  ["home","away"].forEach(t=>{const a=d.teams&&d.teams[t],b=src.teams&&src.teams[t];if(a&&b&&!a.coach&&b.coach){a.coach=b.coach;ch=true}});
+  return ch}
+/* merge imported player-info snapshots: newest per season (single-player fetches of the older one are kept), newest PI_KEEP */
+function mergePinfo(all){let n=0;const idx=ls.get("tacboard.pinfoIdx",{});
+  Object.keys(all||{}).forEach(tid=>{const inc=Array.isArray(all[tid])?all[tid].filter(x=>x&&x.season&&x.at&&x.p):[];if(!inc.length)return;
+    const before=JSON.stringify(piSnaps(tid)),by={};
+    [...piSnaps(tid),...inc].forEach(sn=>{const o=by[sn.season];if(!o){by[sn.season]=sn;return}
+      const [nw,od]=sn.at>=o.at?[sn,o]:[o,sn],m={...nw,p:{...nw.p}};Object.keys(od.p).forEach(k=>{if(od.p[k].solo&&!m.p[k])m.p[k]=od.p[k]});by[sn.season]=m});
+    const list=Object.values(by).sort((a,b)=>a.at-b.at).slice(-PI_KEEP);if(JSON.stringify(list)===before)return;
+    try{localStorage.setItem(piKey(tid),JSON.stringify(list))}catch(e){return}
+    idx[tid]=Math.max(idx[tid]||0,list[list.length-1].at);n++});
+  Object.keys(idx).sort((a,b)=>idx[b]-idx[a]).slice(PI_TEAMS).forEach(k=>{ls.del(piKey(k));delete idx[k]});
+  ls.set("tacboard.pinfoIdx",idx);return n}
 $("fxExport").onclick=async()=>{
   const rec=ls.get("tacboard.recent",[]);
   const items=rec.map(r=>{const data=ls.get("tacboard.match."+r.id,null);if(!data)return null;const shape=ls.get(matchKey(data),null);
     return {id:String(r.id),date:r.date,label:r.label,lg:r.lg,home:r.home||null,away:r.away||null,at:Math.max(r.at||0,shape&&shape.at||0)||null,copy:r.copy||null,data,shape}}).filter(Boolean);
   if(!items.length){fmsg("fxMsg","書き出す試合がありません",true);return}
   const now=Date.now(),stamp=new Date(now+9*3600e3).toISOString().slice(0,16).replace(/[-:]/g,"").replace("T","-");
-  const name=`tactics-board-${stamp}.json`,text=JSON.stringify({app:"tactics-board",kind:"matches",version:1,exportedAt:now,items});
+  const pinfo={};Object.keys(ls.get("tacboard.pinfoIdx",{})).forEach(tid=>{const l=piSnaps(tid);if(l.length)pinfo[tid]=l});
+  const name=`tactics-board-${stamp}.json`,text=JSON.stringify({app:"tactics-board",kind:"matches",version:1,exportedAt:now,items,pinfo,pinfoMax:piMax()});
   const file=new File([text],name,{type:"application/json"});
-  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});fmsg("fxMsg",`${items.length} 試合を書き出しました`);return}}
+  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});fmsg("fxMsg",`${items.length} 試合${pc(pinfo)}を書き出しました`);return}}
   catch(e){if(e&&e.name==="AbortError"){fmsg("fxMsg","書き出しを取り消しました");return}}
   const a=document.createElement("a");a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();
-  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);fmsg("fxMsg",`${items.length} 試合を書き出しました(ダウンロード)`);
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);fmsg("fxMsg",`${items.length} 試合${pc(pinfo)}を書き出しました(ダウンロード)`);
 };
 $("fxImport").onclick=()=>$("fxFile").click();
 $("fxFile").onchange=async e=>{
   const file=e.target.files&&e.target.files[0];e.target.value="";if(!file)return;
   let j;try{j=JSON.parse(await file.text())}catch(err){fmsg("fxMsg","ファイルを読み取れませんでした",true);return}
   if(!j||j.app!=="tactics-board"||!Array.isArray(j.items)){fmsg("fxMsg","このアプリで書き出したファイルではありません",true);return}
-  let added=0,copies=0,same=0;
+  let added=0,copies=0,same=0,filled=0;
   j.items.slice().reverse().forEach(it=>{
     if(!it||!it.data||!it.data.teams||!it.data.teams.home||!Array.isArray(it.data.events)||!it.data.fixture)return;
     const base=String(it.data.fixture),incoming=strip(it);
     const rec=ls.get("tacboard.recent",[]);
     const mine=rec.filter(r=>String(r.id).split("~")[0]===base).map(r=>{const data=ls.get("tacboard.match."+r.id,null);return data?{r,data,shape:ls.get(matchKey(data),null)}:null}).filter(Boolean);
-    if(mine.some(m=>sameContent(strip(m),incoming))){same++;return}
+    const hit=mine.find(m=>sameContent(strip(m),incoming));
+    if(hit){same++;if(fillExtras(hit.data,it.data)){ls.set("tacboard.match."+hit.r.id,hit.data);filled++}return}
     const at=it.at||j.exportedAt||Date.now();let copy=null;
     if(mine.length){copy=new Date(at+9*3600e3).toISOString().slice(0,16).replace(/[-:T]/g,"");let k=copy,n=2;
       while(rec.some(r=>String(r.id)===base+"~"+k))k=copy+"-"+(n++);copy=k}
-    const data={...incoming.d};if(copy)data.copy=copy;const id=entryId(data);
+    const data=JSON.parse(JSON.stringify(it.data));delete data.copy;if(copy)data.copy=copy;const id=entryId(data);
     ls.set("tacboard.match."+id,data);
     if(incoming.s)ls.set(matchKey(data),{...incoming.s,at});else ls.del(matchKey(data));
     const tm=s=>it[s]&&it[s].id?it[s]:(data.teams[s].apiId?{id:data.teams[s].apiId,name:data.teams[s].name}:null);
     putRecent({id,date:it.date||"",label:it.label||`${data.teams.home.name} vs ${data.teams.away.name}`,lg:it.lg||"",at,copy,home:tm("home"),away:tm("away")});
     copy?copies++:added++;
   });
+  if(j.pinfoMax&&!piMax())ls.set("tacboard.pinfoMax",j.pinfoMax);
+  const pn=mergePinfo(j.pinfo);
+  /* the open match may be one of the updated ones: reload its extras into the session */
+  const oid=entryId(S.data),od=oid&&ls.get("tacboard.match."+oid,null);if(od&&fillExtras(S.data,od)){save();render()}
   renderRecent();
-  fmsg("fxMsg",`読み込みました: 追加 ${added} 件 / 別の内容として追加 ${copies} 件 / 同じ内容のため省略 ${same} 件`);
+  fmsg("fxMsg",`読み込みました: 追加 ${added} 件 / 別の内容として追加 ${copies} 件 / 同じ内容のため省略 ${same} 件${filled?`(うち欠場者・スタッツ等を補った ${filled} 件)`:""}${pn?` / 選手情報 ${pn} チーム`:""}`);
 };
 
 /* ---------- registered teams: confirm, then fetch their finished matches of yesterday and today ---------- */
