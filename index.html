@@ -423,7 +423,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104174507">20261104174507</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104175145">20261104175145</span></p>
 </div>
 
 <script>
@@ -1056,11 +1056,13 @@ const lgName=(id,en)=>JA&&lgJa(id,en)||LG_NAME[id]||en||"";
 function venueJa(id,en){const V=NAMES.venues||{};let e=id!=null&&V[id];if(e&&nmMatch(e,en))return e;
   if(en){const f=fold(en);e=Object.values(V).find(x=>x&&x[1]&&fold(x[1])===f);if(e)return e}return null}
 const coachJa=c=>{const e=c&&c.id!=null&&NAMES.coaches&&NAMES.coaches[c.id];return e&&e[0]||null};
-function refJa(en){const R=NAMES.referees||{};if(!en)return null;if(R[en])return R[en][0];const f=fold(en),k=Object.keys(R).find(x=>fold(x)===f);return k?R[k][0]:null}
+/* referees have no API id: names.json keys them by a hash of the folded English name, so no personal name is published in the repo */
+const nmHash=s=>{let h=0x811c9dc5;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193)>>>0}return "h"+h.toString(16).padStart(8,"0")};
+function refJa(en){const R=NAMES.referees||{};if(!en)return null;const e=R[nmHash(fold(en))];return e&&e[0]||null}
 /* the API sends some characters as HTML entities (O&apos;Brien) */
 const unent=s=>String(s??"").replace(/&(apos|#39|quot|lt|gt|amp);/g,(m,k)=>({apos:"'","#39":"'",quot:'"',lt:"<",gt:">",amp:"&"}[k]));
 const pName=p=>{const e=JA&&plJa(p);return e&&e[0]||unent(p.name)};
-const pShort=p=>{const e=JA&&plJa(p);return e&&e[0]?(e[2]||e[0].split("・").pop()):unent(p.name)};
+const pShort=p=>{const e=JA&&plJa(p);return e&&e[0]?(e[NAMES.format>=2?1:2]||e[0].split("・").pop()):unent(p.name)};   /* format 2: [ja, short] (no English names) */
 /* returns "new" | "same" | "fail"; only the names are redrawn, the board, time and applied events stay as they are */
 async function loadNames(){try{const r=await fetch("names.json",{cache:"no-cache"});if(!r.ok)return "fail";const j=await r.json();
   if(!j||typeof j.teams!=="object"||typeof j.players!=="object")return "fail";if(JSON.stringify(j)===JSON.stringify(NAMES))return "same";
