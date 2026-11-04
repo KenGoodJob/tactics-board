@@ -27,7 +27,7 @@
   - 試合全体: `fixtures/statistics?fixture=&half=true`(エラーなら half なし)で1回。前半は応答の `statistics_1h` 等があるときだけ表示し、無ければ「取得できませんでした(応答の項目: …)」。**前半の行に試合全体の数字は出さない**
   - 選手: `fixtures/players?fixture=` で1回。試合終了の行だけ(試合全体の数字しか無く、前半に出すとネタバレになるため)。チーム切り替え・列見出しで並べ替え・横スクロールの表
   - 試合終了のスタッツを広げている間だけ、盤面(控えの列も)の選手の左上に評価(0より大きいもの)を色つきで表示(8以上緑・7以上青・6以上灰・6未満赤)
-  - ファイル読み込み時の「同じ内容」判定では stats・kickoff・season・info・inj・teams.*.coach を除く
+  - ファイル読み込み時の「同じ内容」判定では stats・kickoff・season・info・inj・teams.*.coach・players[].pos を除く(pos は「同じ内容」でも端末側に無ければ補う)
 
 ### ボード
 - 22人を表示。ドラッグで移動できる
@@ -38,6 +38,7 @@
 - 保存する位置はキックオフ時の向き基準で持ち、表示時に反転する
 - 盤面のマーク(反映済みの範囲だけ): この試合の警告は丸の右上に黄色いカード、得点・アシストは丸の上に「⚽」「👟」(2以上は数字つき、例 ⚽2👟)。「盤面にカード・得点」で表示オン/オフ(初期値オン)
 - 顔写真: `https://media.api-sports.io/football/players/<選手ID>.png` を選手の apiId から組み立てて表示(APIリクエストは使わない)。選手一覧は名前の左に常に表示。盤面は「盤面に顔写真」でオン/オフ(初期値オン)、写真のときは丸の外周をチーム色にし、背番号は名前の前に出す(「10 ハルトマン」)。読み込めない写真は表示せず、盤面はその選手だけ背番号の丸に戻す
+- 選手一覧のポジション: 全員(スタメン・控え)の背番号の右に GK/DF/MF/FW の色つきラベル(GK黄・DF青・MF緑・FW赤)。`fixtures/lineups` の各選手の `pos`(G/D/M/F)を読み込み時に `players[].pos` に保存(追加のAPIなし)。この機能より前に保存した試合には無く、ラベルは出ない(読み込み直せば付く)。細かい位置(右SBなど)や交代後の位置は API に無い。テスト用・サンプルの試合にも入れてある。「試合データを編集」で選手欄を書き換えても、背番号と名前が同じ選手の pos・apiId は残す
 - 選手一覧のタグ: OUT/IN/退場 に加え、警告・得点・アシスト・OG(時刻つき)。警告は黄色いカード、退場は2枚目の警告なら黄色2枚・一発退場なら赤いカードを添える(API の detail に second があるか、同じ試合で先に警告を受けていれば2枚目の警告とみなす。event に `second:true`)
 - 盤面の退場者: 丸に赤いカード(2枚目の警告なら黄・黄・赤)。カード・得点の表示オフでも退場のカードは出す
 - スコア欄: 退場者が出たらチーム名の横に人数分の赤いカード
@@ -111,7 +112,7 @@
 
 ### データ形式(書き出し・読み込み用 JSON)
 ```
-{ fixture(APIの試合のみ), kickoff・season・info(APIの試合のみ、この機能以降), teams: { home|away: { name, apiId(APIのみ), color, formation, coach({id,name}、APIのみ), players: [{id, num, name, starter}] } },
+{ fixture(APIの試合のみ), kickoff・season・info(APIの試合のみ、この機能以降), teams: { home|away: { name, apiId(APIのみ), color, formation, coach({id,name}、APIのみ), players: [{id, num, name, pos(G|D|M|F、省略可), starter}] } },
   events: [{ id, type: goal|og|sub|yellow|red|pso_goal|pso_miss, team, period: 1H|2H|ET1|ET2|PK,
              min, add, player, playerIn(subのみ), assist(goalのみ・省略可) }] }
 ```

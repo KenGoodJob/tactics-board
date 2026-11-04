@@ -175,6 +175,8 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:14px}
 .plist li{display:grid;grid-template-columns:2.2em 1fr auto;gap:6px;align-items:baseline}
 .num{font-family:var(--f-display);font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted);text-align:right}
+.pos{display:inline-block;min-width:2.2em;margin-right:6px;font-size:11px;font-weight:700;text-align:center;border-radius:4px;padding:0 3px;color:#fff;vertical-align:1px}
+.posG{background:#c58a12}.posD{background:#2f6db3}.posM{background:#2e8a55}.posF{background:#b8433a}
 .tag{font-size:11px;padding:0 6px;border-radius:4px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
 .tag.in{color:var(--accent);border-color:currentColor}
 .tag.out{opacity:.8}
@@ -432,7 +434,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105015554">20261105015554</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105021746">20261105021746</span></p>
 </div>
 
 <script>
@@ -454,18 +456,18 @@ const MAX_AT=30;
 const TYPE_LABEL={goal:"得点",og:"OG",sub:"交代",yellow:"警告",red:"退場",pso_goal:"PK○",pso_miss:"PK×"};
 const TYPE_COLOR={goal:"#1e6a47",og:"#6b5a2e",sub:"#3a5f9e",yellow:"#b8901a",red:"#b23a2e",pso_goal:"#1e6a47",pso_miss:"#6c6c6c"};
 
-function P(t,list){return list.map(([num,name],i)=>({id:t+"-"+num,num,name,starter:i<11}))}
+function P(t,list){return list.map(([num,name,pos],i)=>({id:t+"-"+num,num,name,...(pos?{pos}:{}),starter:i<11}))}
 const SAMPLE={
 
   teams:{
     home:{name:"ノルトハーフェン",color:"#c8432f",formation:"4-2-3-1",players:P("home",[
-      [1,"ブラント"],[2,"ケラー"],[4,"アルノ"],[5,"ジーモン"],[3,"ファルク"],
-      [6,"ロート"],[8,"ヴェーバー"],[7,"ニコ"],[10,"ハルトマン"],[11,"ベルガー"],[9,"ランゲ"],
-      [12,"ツィマー"],[14,"オルト"],[17,"フリッツ"],[19,"ザイデル"],[20,"クルーゲ"],[21,"マイ"],[23,"ポール"]])},
+      [1,"ブラント","G"],[2,"ケラー","D"],[4,"アルノ","D"],[5,"ジーモン","D"],[3,"ファルク","D"],
+      [6,"ロート","M"],[8,"ヴェーバー","M"],[7,"ニコ","M"],[10,"ハルトマン","M"],[11,"ベルガー","M"],[9,"ランゲ","F"],
+      [12,"ツィマー","G"],[14,"オルト","F"],[17,"フリッツ","M"],[19,"ザイデル","M"],[20,"クルーゲ","D"],[21,"マイ","D"],[23,"ポール","M"]])},
     away:{name:"エスタディオ・ソラール",color:"#2d63c4",formation:"4-3-3",players:P("away",[
-      [13,"ベガ"],[2,"モラレス"],[5,"イバラ"],[4,"コルテス"],[3,"ルナ"],
-      [8,"サラス"],[6,"オルティス"],[10,"ミロ"],[7,"パレデス"],[9,"ガルセス"],[11,"リオス"],
-      [1,"カンポ"],[14,"アランダ"],[15,"デルガド"],[16,"ソト"],[18,"ナバロ"],[19,"ブエノ"],[22,"レジェス"]])}
+      [13,"ベガ","G"],[2,"モラレス","D"],[5,"イバラ","D"],[4,"コルテス","D"],[3,"ルナ","D"],
+      [8,"サラス","M"],[6,"オルティス","M"],[10,"ミロ","M"],[7,"パレデス","F"],[9,"ガルセス","F"],[11,"リオス","F"],
+      [1,"カンポ","G"],[14,"アランダ","D"],[15,"デルガド","M"],[16,"ソト","D"],[18,"ナバロ","F"],[19,"ブエノ","M"],[22,"レジェス","F"]])}
   },
   events:[
     {id:"e1",type:"goal",team:"home",period:"1H",min:23,add:0,player:"home-9",assist:"home-10"},
@@ -498,11 +500,11 @@ const TEST_A=()=>{const d=clone(SAMPLE);d.events=[
   d.stats=testStats(d,true,120);return d};
 const TEST_B=()=>{const P2=(t,l)=>P(t,l);const d={teams:{
     home:{name:"リヴァーポート",color:"#f2f2f2",formation:"3-4-2-1",players:P2("home",[
-      [31,"オーウェン"],[4,"ハリス"],[5,"コール"],[6,"ブレイク"],[2,"ウォード"],[8,"フィンチ"],[14,"ケイン"],[3,"モス"],[7,"リード"],[10,"アシュトン"],[9,"グレイ"],
-      [1,"パイク"],[11,"ドレイク"],[15,"ヘイズ"],[17,"ノックス"],[18,"ベイリー"],[20,"クロス"],[22,"ストーン"],[24,"ライト"]])},
+      [31,"オーウェン","G"],[4,"ハリス","D"],[5,"コール","D"],[6,"ブレイク","D"],[2,"ウォード","M"],[8,"フィンチ","M"],[14,"ケイン","M"],[3,"モス","M"],[7,"リード","M"],[10,"アシュトン","M"],[9,"グレイ","F"],
+      [1,"パイク","G"],[11,"ドレイク","F"],[15,"ヘイズ","D"],[17,"ノックス","M"],[18,"ベイリー","F"],[20,"クロス","F"],[22,"ストーン","D"],[24,"ライト","M"]])},
     away:{name:"モンテ・ロッソ",color:"#7a1f3d",formation:"4-4-2",players:P2("away",[
-      [12,"ロッシ"],[2,"コンティ"],[3,"ガッリ"],[5,"モレッティ"],[13,"リーヴァ"],[7,"ビアンキ"],[6,"ロマーノ"],[8,"エスポジト"],[11,"マリーニ"],[9,"ロンバルディ"],[10,"フォンタナ"],
-      [1,"サルヴィ"],[4,"テスタ"],[14,"ヴィターレ"],[15,"カルボーネ"],[16,"ペッレグリーニ"],[17,"ジェンティーレ"],[18,"ファリーナ"],[19,"モンティ"],[20,"グレコ"],[21,"ルッソ"],[23,"ベネデッティ"],[99,"コロンボ"]])}},
+      [12,"ロッシ","G"],[2,"コンティ","D"],[3,"ガッリ","D"],[5,"モレッティ","D"],[13,"リーヴァ","D"],[7,"ビアンキ","M"],[6,"ロマーノ","M"],[8,"エスポジト","M"],[11,"マリーニ","M"],[9,"ロンバルディ","F"],[10,"フォンタナ","F"],
+      [1,"サルヴィ","G"],[4,"テスタ","D"],[14,"ヴィターレ","D"],[15,"カルボーネ","M"],[16,"ペッレグリーニ","M"],[17,"ジェンティーレ","F"],[18,"ファリーナ","M"],[19,"モンティ","F"],[20,"グレコ","D"],[21,"ルッソ","M"],[23,"ベネデッティ","F"],[99,"コロンボ","G"]])}},
   events:[
     ev("b1","goal","away","1H",2,0,"away-9",{assist:"away-10"}),ev("b2","yellow","home","1H",12,0,"home-5"),
     ev("b3","og","away","1H",27,0,"away-3"),ev("b4","goal","home","1H",34,0,"home-10",{assist:"home-7"}),
@@ -717,7 +719,7 @@ function render(){
     $(t==="home"?"benchH":"benchA").innerHTML=players(t).map(p=>{
       const tags=(st.tags[p.id]||[]).map(x=>`<span class="tag ${x.cls}">${x.pre||""}${esc(x.txt)}</span>`).join(" ");
       const gone=!on.has(p.id);
-      return `<li class="${gone?"gone":""}" data-pinfo="${esc(p.id)}"><span class="num">${esc(p.num)}</span><span>${faceImg(p)}${esc(pName(p))}${p.starter?"":` <span class="tag">控え</span>`}</span><span>${tags}</span></li>`;
+      return `<li class="${gone?"gone":""}" data-pinfo="${esc(p.id)}"><span class="num">${esc(p.num)}</span><span>${posTag(p)}${faceImg(p)}${esc(pName(p))}${p.starter?"":` <span class="tag">控え</span>`}</span><span>${tags}</span></li>`;
     }).join("");
   });
   // log: one row per moment, home left / away right
@@ -1013,7 +1015,9 @@ function parsePl(t,text){
   text.split("\n").forEach(line=>{line=line.trim();if(!line)return;if(/^-{3,}$/.test(line)){bench=true;return}
     const m=/^(\d+)\s*(.*)$/.exec(line);const num=m?m[1]:"";const name=m?(m[2]||"#"+m[1]):line;
     let id=t+"-"+(num||"x");while(seen[id])id+="_";seen[id]=1;
-    const starter=!bench&&count<11;if(starter)count++;out.push({id,num,name,starter})});
+    const starter=!bench&&count<11;if(starter)count++;
+    const old=S.data.teams[t].players.find(p=>p.num===num&&p.name===name)||{};
+    out.push({id,num,name,...(old.apiId!=null?{apiId:old.apiId}:{}),...(old.pos?{pos:old.pos}:{}),starter})});
   return out;
 }
 function renderEditor(){
@@ -1239,7 +1243,7 @@ function convert(fx,lineups,events){
     const xi=(L.startXI||[]).map(x=>x.player).sort((a,b)=>{const ga=grid(a),gb=grid(b);return ga[0]-gb[0]||gb[1]-ga[1]});
     const subs=(L.substitutes||[]).map(x=>x.player);
     const co=L.coach&&L.coach.id!=null?{id:L.coach.id,name:L.coach.name||""}:null;
-    const mk=(p,starter)=>({id:s+"-"+(p.id!=null?p.id:"n"+p.number),apiId:p.id,num:p.number!=null?String(p.number):"",name:p.name||"?",starter});
+    const mk=(p,starter)=>({id:s+"-"+(p.id!=null?p.id:"n"+p.number),apiId:p.id,num:p.number!=null?String(p.number):"",name:p.name||"?",...(/^[GDMF]$/.test(p.pos||"")?{pos:p.pos}:{}),starter});
     const col=L.team&&L.team.colors&&L.team.colors.player;
     teams[s]={name:tm.name,apiId:tm.id,color:hex(col&&col.primary)||(s==="home"?"#c8432f":"#2d63c4"),
       formation:L.formation||"4-4-2",...(co?{coach:co}:{}),players:[...xi.map(p=>mk(p,true)),...subs.map(p=>mk(p,false))]};
@@ -1283,6 +1287,9 @@ function convert(fx,lineups,events){
 const PI_KEEP=3,PI_TEAMS=60;
 const piKey=id=>"tacboard.pinfo."+id;
 const POS_JA={Goalkeeper:"GK",Defender:"DF",Midfielder:"MF",Attacker:"FW"};
+/* position from fixtures/lineups (G/D/M/F, starters and bench); matches saved before this feature have none */
+const LU_POS={G:"GK",D:"DF",M:"MF",F:"FW"};
+function posTag(p){const k=LU_POS[p.pos];return k?`<span class="pos pos${p.pos}">${k}</span>`:""}
 const NAT_JA={England:"イングランド",Scotland:"スコットランド",Wales:"ウェールズ","Northern Ireland":"北アイルランド",Ireland:"アイルランド",Spain:"スペイン",Italy:"イタリア",Germany:"ドイツ",France:"フランス",
   Portugal:"ポルトガル",Netherlands:"オランダ",Belgium:"ベルギー",Switzerland:"スイス",Austria:"オーストリア",Denmark:"デンマーク",Sweden:"スウェーデン",Norway:"ノルウェー",Finland:"フィンランド",Iceland:"アイスランド",
   Poland:"ポーランド","Czech Republic":"チェコ",Czechia:"チェコ",Slovakia:"スロバキア",Hungary:"ハンガリー",Croatia:"クロアチア",Serbia:"セルビア",Slovenia:"スロベニア","Bosnia and Herzegovina":"ボスニア・ヘルツェゴビナ",
@@ -1563,15 +1570,16 @@ $("fRecent").addEventListener("click",e=>{
 
 /* ---------- export / import of saved matches as a file (for the Files app / iCloud Drive) ---------- */
 const sameContent=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.inj;delete d.kickoff;delete d.season;delete d.info;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach}})}const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
+const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.inj;delete d.kickoff;delete d.season;delete d.info;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach;if(Array.isArray(d.teams[t].players))d.teams[t].players=d.teams[t].players.map(p=>{const q={...p};delete q.pos;return q})}})}const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
 const pc=o=>{const n=Object.keys(o).length;return n?`と ${n} チームの選手情報`:""};
-/* fill what the saved copy lacks from an imported copy of the same match (injuries, stats, match info, coaches, kickoff, season) */
+/* fill what the saved copy lacks from an imported copy of the same match (injuries, stats, match info, coaches, kickoff, season, positions) */
 function fillExtras(d,src){let ch=false;const has=v=>v!=null&&!(typeof v==="object"&&!Object.keys(v).length);
   ["kickoff","season"].forEach(k=>{if(!has(d[k])&&has(src[k])){d[k]=src[k];ch=true}});
   if(has(src.info)){if(!has(d.info)){d.info=src.info;ch=true}else Object.keys(src.info).forEach(k=>{if(!has(d.info[k])&&has(src.info[k])){d.info[k]=src.info[k];ch=true}})}
   if(src.inj&&(!d.inj||(src.inj.at||0)>(d.inj.at||0))){d.inj=src.inj;ch=true}
   if(has(src.stats)){if(!has(d.stats)){d.stats=src.stats;ch=true}else Object.keys(src.stats).forEach(k=>{if(!has(d.stats[k])&&has(src.stats[k])){d.stats[k]=src.stats[k];ch=true}})}
-  ["home","away"].forEach(t=>{const a=d.teams&&d.teams[t],b=src.teams&&src.teams[t];if(a&&b&&!a.coach&&b.coach){a.coach=b.coach;ch=true}});
+  ["home","away"].forEach(t=>{const a=d.teams&&d.teams[t],b=src.teams&&src.teams[t];if(a&&b&&!a.coach&&b.coach){a.coach=b.coach;ch=true}
+    if(a&&b&&Array.isArray(a.players)&&Array.isArray(b.players))a.players.forEach(p=>{const q=b.players.find(x=>x.id===p.id);if(!p.pos&&q&&q.pos){p.pos=q.pos;ch=true}})});
   return ch}
 /* merge imported player-info snapshots: newest per season (single-player fetches of the older one are kept), newest PI_KEEP */
 function mergePinfo(all){let n=0;const idx=ls.get("tacboard.pinfoIdx",{});
