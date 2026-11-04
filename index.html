@@ -254,6 +254,10 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
 <body>
 
 <div class="wrap">
+  <div class="tmprompt" id="updPrompt" hidden>
+    <span id="updText">新しい版があります</span>
+    <span class="btns"><button class="update" id="updGo" style="margin-left:0">更新する</button><button class="ghost" id="updLater">あとで</button></span>
+  </div>
   <div class="tmprompt" id="tmPrompt" hidden>
     <span>登録チームの試合を確認しますか(前日・当日)</span>
     <span class="btns"><button class="update" id="tmGo" style="margin-left:0">確認する</button><button class="ghost" id="tmLater">あとで</button></span>
@@ -423,7 +427,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104175145">20261104175145</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104180308">20261104180308</span></p>
 </div>
 
 <script>
@@ -1438,6 +1442,22 @@ async function fetchInj(){const d=S.data;if(!d.fixture||INJ_BUSY)return;INJ_BUSY
   INJ_BUSY=false;renderInj()}
 $("inj").addEventListener("click",e=>{if(e.target.closest("#injFetch"))fetchInj()});
 
+/* ---------- new version notice ----------
+   A home-screen web app is resumed rather than reloaded and keeps its own HTTP cache (GitHub Pages allows 10 min),
+   so it can show an old version for a long time. Fetching the page with cache:"reload" both reads the published
+   version and refreshes the cached copy; a reload then gets the new page. sessionStorage (time, board, applied events) survives. */
+const MY_VER=$("ver").dataset.ver;let UPD_AT=0,UPD_VER=null;
+async function checkUpdate(){if(Date.now()-UPD_AT<60e3)return;UPD_AT=Date.now();
+  try{const r=await fetch(location.pathname,{cache:"reload"});if(!r.ok)return;const m=/data-ver="(\d{14})"/.exec(await r.text());
+    if(m&&m[1]>MY_VER){UPD_VER=m[1];$("updText").textContent=`新しい版があります(${m[1].slice(4,6)}/${m[1].slice(6,8)} ${m[1].slice(8,10)}:${m[1].slice(10,12)})`;$("updPrompt").hidden=false}}catch(e){}}
+$("updGo").onclick=()=>{try{sessionStorage.setItem("tacboard.updTo",UPD_VER||"")}catch(e){}location.reload()};
+$("updLater").onclick=()=>{$("updPrompt").hidden=true};
+/* if the reload still served the old page, load it once more under a fresh URL that no cache can hold */
+(()=>{let to="";try{to=sessionStorage.getItem("tacboard.updTo")||"";sessionStorage.removeItem("tacboard.updTo")}catch(e){}
+  if(to&&to>MY_VER&&!/[?&]r=/.test(location.search))location.replace(location.pathname+"?r="+to)})();
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")checkUpdate()});
+window.addEventListener("pageshow",e=>{if(e.persisted)checkUpdate()});
+
 /* ---------- jump menu (bottom right): scroll to a section, opening it if it is a <details> ---------- */
 $("jumpBtn").onclick=e=>{e.stopPropagation();const m=$("jumpMenu");m.hidden=!m.hidden;$("jumpBtn").setAttribute("aria-expanded",String(!m.hidden))};
 $("jumpMenu").addEventListener("click",e=>{const b=e.target.closest("[data-jump]");if(!b)return;const k=b.dataset.jump;$("jumpMenu").hidden=true;$("jumpBtn").setAttribute("aria-expanded","false");
@@ -1592,7 +1612,7 @@ $("finder").addEventListener("toggle",()=>{if($("finder").open)renderNameBox()})
 $("nmReload").onclick=async()=>{$("nmReload").disabled=true;fmsg("nmMsg","読み直しています…");const r=await loadNames();$("nmReload").disabled=false;
   renderNameBox();fmsg("nmMsg",r==="new"?"新しい対応表を反映しました":r==="same"?"対応表は最新です(変更はありません)":"読み直せませんでした。通信状態を確認してください",r==="fail")};
 
-$("fDate").value=todayJST();dateRange();renderUsage();renderLeagues();renderRecent();renderKey();renderTeams();promptCheck();renderNameBox();loadNames();
+$("fDate").value=todayJST();dateRange();renderUsage();renderLeagues();renderRecent();renderKey();renderTeams();promptCheck();renderNameBox();loadNames();checkUpdate();
 
 buildChips();renderEditor();render();
 })();
