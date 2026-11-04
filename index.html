@@ -252,7 +252,6 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     </div>
     <div class="trow">
       <div class="chips" id="segChips"></div>
-      <button class="update" id="updateBtn">更新</button>
     </div>
     <div class="status" id="status"></div>
   </section>
@@ -382,7 +381,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104153101">20261104153101</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104154032">20261104154032</span></p>
 </div>
 
 <script>
@@ -819,9 +818,8 @@ function renderTime(){
   $("pendLabel").textContent=tLabel(p);$("pendLabel").classList.toggle("diff",diff);
   $("pendSeg").textContent=diff?"タップで更新":tSeg(p);$("tnow").disabled=!diff;$("tnow").setAttribute("aria-label",diff?tLabel(p)+"まで更新":tLabel(p));
   document.querySelectorAll(".segbtn").forEach(b=>b.classList.toggle("on",b.dataset.seg===p.seg));
-  $("updateBtn").disabled=!diff;
-  $("status").innerHTML=diff?`ボードは <b>${esc(tLabel(a))}</b> の状態です。「更新」で ${esc(tLabel(p))} まで反映します。`
-    :`見終えた時間に合わせて「更新」を押すと、そこまでの交代・退場・得点を反映します。`;
+  $("status").innerHTML=diff?`ボードは <b>${esc(tLabel(a))}</b> の状態です。時間をタップすると ${esc(tLabel(p))} まで反映します。`
+    :`見終えた時間に合わせて時間を動かし、時間をタップすると、そこまでの交代・退場・得点を反映します。`;
 }
 const tmsg={home:"",away:""};
 function renderFmSelects(){
@@ -852,7 +850,7 @@ function renderFmSelects(){
 /* ---------- time controls ---------- */
 $("steps").addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;step(+b.dataset.step);renderTime();save()});
 $("segChips").addEventListener("click",e=>{const b=e.target.closest("[data-seg]");if(!b)return;jump(b.dataset.seg);renderTime();save()});
-$("updateBtn").onclick=$("tnow").onclick=()=>{S.applied=norm(S.pending);BENCH_POS={};save();render()};
+$("tnow").onclick=()=>{S.applied=norm(S.pending);BENCH_POS={};save();render()};
 /* tapping a time in 反映済みの出来事 moves the clock back there and applies it (already seen, so nothing new is revealed) */
 $("log").addEventListener("click",e=>{
   const sb=e.target.closest("[data-stats]");if(sb){const k=sb.dataset.stats;STATS_OPEN[k]=!STATS_OPEN[k];STATS_MSG="";render();if(STATS_OPEN[k])fetchStats(k,false);return}
