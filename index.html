@@ -24,11 +24,11 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#101814; --surface:#18221d; --fg:#e4ece6; --muted:#97a89d; --line:#2c3a32;
   --accent:#3fa774; --accent-fg:#06140d; --pending:#e0a24a; --danger:#e0675a;
-  --board:#1d3a2e; --board-edge:#0c1812; color-scheme:dark}}
+  --board:#1d3a2e; --board-edge:#0c1812; --lgbg:rgba(255,255,255,.9); color-scheme:dark}}
 :root[data-theme="dark"]{
   --bg:#101814; --surface:#18221d; --fg:#e4ece6; --muted:#97a89d; --line:#2c3a32;
   --accent:#3fa774; --accent-fg:#06140d; --pending:#e0a24a; --danger:#e0675a;
-  --board:#1d3a2e; --board-edge:#0c1812; color-scheme:dark}
+  --board:#1d3a2e; --board-edge:#0c1812; --lgbg:rgba(255,255,255,.9); color-scheme:dark}
 html,body{background:var(--bg);color:var(--fg)}
 body{font-family:var(--f-body);font-size:15px;line-height:1.6;
   padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px 40px}
@@ -49,6 +49,7 @@ img.face{width:24px;height:24px;border-radius:50%;object-fit:cover;object-positi
 .team .logo{width:30px;height:30px}
 .tl .hd .logo,.tctrl .th .logo{width:20px;height:20px}
 .fxlist .logo{width:16px;height:16px;margin-right:3px}
+.logo.lgo{width:14px;height:14px;margin-right:4px;background:var(--lgbg,transparent);border-radius:3px;padding:1px;box-sizing:border-box}
 .tmchip .logo{width:16px;height:16px;margin-right:-2px}
 .panel h2 .logo{width:18px;height:18px;margin-right:6px;vertical-align:-3px}
 .chip{width:14px;height:14px;border-radius:50%;flex:none;box-shadow:0 0 0 2px var(--surface),0 0 0 3px var(--line)}
@@ -211,6 +212,7 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .jmenu{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.25);overflow:hidden}
 .jmenu button{border:0;border-bottom:1px solid var(--line);background:none;padding:9px 18px;font-size:14px;text-align:left}
 .jmenu button:last-child{border-bottom:0}
+.ev .evn{font-size:11px;color:var(--muted);margin-left:2px}
 .ev .pn{text-decoration:underline dotted;text-underline-offset:3px}
 .pst td.pn{text-decoration:underline dotted;text-underline-offset:3px}
 .pcard{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
@@ -403,7 +405,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
           <label class="field">種類<select id="evType">
             <option value="goal">得点</option><option value="og">オウンゴール</option>
             <option value="sub">交代</option><option value="yellow">警告</option><option value="red">退場</option>
-            <option value="pso_goal">PK戦 成功</option><option value="pso_miss">PK戦 失敗</option></select></label>
+            <option value="pen_miss">PK失敗(試合中)</option><option value="pso_goal">PK戦 成功</option><option value="pso_miss">PK戦 失敗</option></select></label>
           <label class="field">チーム<select id="evTeam"><option value="home">ホーム</option><option value="away">アウェイ</option></select></label>
           <label class="field" id="evPeriodF">区間<select id="evPeriod"></select></label>
           <label class="field" id="evMinF">分<input type="number" id="evMin" min="0" max="130" value="1"></label>
@@ -434,7 +436,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105023119">20261105023119</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105050943">20261105050943</span></p>
 </div>
 
 <script>
@@ -453,18 +455,35 @@ const isPso=e=>e.type==="pso_goal"||e.type==="pso_miss";
 /* n-th kick of the shoot-out (1-based, in the order of the events) */
 const pkNo=e=>S.data.events.filter(isPso).indexOf(e)+1;
 const MAX_AT=30;
-const TYPE_LABEL={goal:"得点",og:"OG",sub:"交代",yellow:"警告",red:"退場",pso_goal:"PK○",pso_miss:"PK×"};
-const TYPE_COLOR={goal:"#1e6a47",og:"#6b5a2e",sub:"#3a5f9e",yellow:"#b8901a",red:"#b23a2e",pso_goal:"#1e6a47",pso_miss:"#6c6c6c"};
+const TYPE_LABEL={goal:"得点",og:"OG",sub:"交代",yellow:"警告",red:"退場",pen_miss:"PK失敗",var:"VAR",pso_goal:"PK○",pso_miss:"PK×"};
+const TYPE_COLOR={goal:"#1e6a47",og:"#6b5a2e",sub:"#3a5f9e",yellow:"#b8901a",red:"#b23a2e",pen_miss:"#6c6c6c",var:"#6a4c9c",pso_goal:"#1e6a47",pso_miss:"#6c6c6c"};
+/* reason of a card (API events "comments") and what a VAR check decided (API "detail"); unknown text stays in English */
+const CARD_WHY={"foul":"反則","argument":"異議","dissent":"異議","time wasting":"遅延行為","delay of game":"遅延行為","handball":"ハンド","unsportsmanlike conduct":"反スポーツ的行為",
+  "simulation":"シミュレーション","professional foul":"戦術的な反則","roughing":"乱暴な行為","violent conduct":"暴力行為","serious foul":"著しく不正なプレー","serious foul play":"著しく不正なプレー",
+  "holding":"ホールディング","tripping":"トリッピング","pushing":"プッシング","elbowing":"肘打ち","off the ball foul":"ボールのない所での反則","encroachment":"距離不足",
+  "not respecting distance":"距離不足","entering field":"無許可の入場","leaving field":"無許可の退出","excessive celebration":"過度な喜び方","spitting":"つば吐き","biting":"かみつき"};
+const whyJa=w=>{const k=String(w||"").trim();return CARD_WHY[k.toLowerCase()]||k};
+function varJa(d){const s=String(d||"").toLowerCase(),r=/offside/.test(s)?"オフサイド":/hand/.test(s)?"ハンド":/foul/.test(s)?"ファウル":"";
+  if(/goal/.test(s)&&/(cancel|disallow)/.test(s))return "ゴール取り消し"+(r?"("+r+")":"");
+  if(/goal/.test(s)&&/confirm/.test(s))return "ゴール確定";
+  if(/penalty/.test(s)&&/cancel/.test(s))return "PK取り消し";
+  if(/penalty/.test(s)&&/(confirm|award)/.test(s))return "PK判定";
+  if(/red card/.test(s)&&/cancel/.test(s))return "退場取り消し";
+  if(/card/.test(s)&&/cancel/.test(s))return "カード取り消し";
+  if(/card/.test(s)&&/upgrade/.test(s))return "カード変更";
+  return String(d||"")}
+/* extra text shown after the player name: penalty goal, card reason, VAR decision */
+const evNote=e=>e.type==="goal"&&e.pen?"PK":(e.type==="yellow"||e.type==="red")&&e.why?whyJa(e.why):e.type==="var"?varJa(e.note):"";
 
 function P(t,list){return list.map(([num,name,pos],i)=>({id:t+"-"+num,num,name,...(pos?{pos}:{}),starter:i<11}))}
 const SAMPLE={
 
   teams:{
-    home:{name:"ノルトハーフェン",color:"#c8432f",formation:"4-2-3-1",players:P("home",[
+    home:{name:"ノルトハーフェン",color:"#c8432f",numColor:"#ffffff",gkColor:"#f2c230",gkNum:"#111111",formation:"4-2-3-1",players:P("home",[
       [1,"ブラント","G"],[2,"ケラー","D"],[4,"アルノ","D"],[5,"ジーモン","D"],[3,"ファルク","D"],
       [6,"ロート","M"],[8,"ヴェーバー","M"],[7,"ニコ","M"],[10,"ハルトマン","M"],[11,"ベルガー","M"],[9,"ランゲ","F"],
       [12,"ツィマー","G"],[14,"オルト","F"],[17,"フリッツ","M"],[19,"ザイデル","M"],[20,"クルーゲ","D"],[21,"マイ","D"],[23,"ポール","M"]])},
-    away:{name:"エスタディオ・ソラール",color:"#2d63c4",formation:"4-3-3",players:P("away",[
+    away:{name:"エスタディオ・ソラール",color:"#2d63c4",numColor:"#ffffff",gkColor:"#1f1f1f",gkNum:"#f2f2f2",formation:"4-3-3",players:P("away",[
       [13,"ベガ","G"],[2,"モラレス","D"],[5,"イバラ","D"],[4,"コルテス","D"],[3,"ルナ","D"],
       [8,"サラス","M"],[6,"オルティス","M"],[10,"ミロ","M"],[7,"パレデス","F"],[9,"ガルセス","F"],[11,"リオス","F"],
       [1,"カンポ","G"],[14,"アランダ","D"],[15,"デルガド","M"],[16,"ソト","D"],[18,"ナバロ","F"],[19,"ブエノ","M"],[22,"レジェス","F"]])}
@@ -485,33 +504,33 @@ const clone=o=>JSON.parse(JSON.stringify(o));
 /* ---------- test matches (fictional, for checking rare cases such as extra time / shoot-outs at any time) ---------- */
 const ev=(id,type,team,period,min,add,player,x={})=>({id,type,team,period,min,add,player,...x});
 const TEST_A=()=>{const d=clone(SAMPLE);d.events=[
-  ev("a1","goal","home","1H",9,0,"home-9",{assist:"home-10"}),ev("a2","yellow","away","1H",17,0,"away-4"),
-  ev("a3","goal","away","1H",30,0,"away-9",{assist:"away-7"}),ev("a4","yellow","home","1H",45,1,"home-6"),
-  ev("a5","goal","home","1H",45,2,"home-9",{assist:"home-11"}),
+  ev("a1","goal","home","1H",9,0,"home-9",{assist:"home-10"}),ev("a2","yellow","away","1H",17,0,"away-4",{why:"Foul"}),
+  ev("a3","goal","away","1H",30,0,"away-9",{assist:"away-7"}),ev("a4","yellow","home","1H",45,1,"home-6",{why:"Argument"}),
+  ev("a5","goal","home","1H",45,2,"home-9",{assist:"home-11"}),ev("a5v","var","away","1H",40,0,"away-9",{note:"Goal Disallowed - offside"}),
   ev("a6","sub","away","2H",58,0,"away-11",{playerIn:"away-18"}),ev("a7","red","away","2H",61,0,"away-4",{second:true}),
-  ev("a8","goal","home","2H",66,0,"home-9"),ev("a9","og","home","2H",70,0,"home-2"),
+  ev("a8","goal","home","2H",66,0,"home-9",{pen:true}),ev("a8m","pen_miss","away","2H",68,0,"away-9"),ev("a9","og","home","2H",70,0,"home-2"),
   ev("a10","sub","home","2H",78,0,"home-7",{playerIn:"home-17"}),ev("a11","sub","home","2H",85,0,"home-11",{playerIn:"home-14"}),
   ev("a12","goal","away","2H",90,4,"away-18",{assist:"away-10"}),
-  ev("a13","sub","away","ET1",95,0,"away-10",{playerIn:"away-15"}),ev("a14","yellow","home","ET1",100,0,"home-17"),
+  ev("a13","sub","away","ET1",95,0,"away-10",{playerIn:"away-15"}),ev("a14","yellow","home","ET1",100,0,"home-17",{why:"Time wasting"}),
   ev("a15","sub","home","ET2",110,0,"home-6",{playerIn:"home-19"}),ev("a16","sub","home","ET2",120,2,"home-1",{playerIn:"home-12"})];
   const pk=[["home","home-9",1],["away","away-9",1],["home","home-10",1],["away","away-18",0],["home","home-14",0],["away","away-7",1],
     ["home","home-17",1],["away","away-15",1],["home","home-19",1],["away","away-6",1],["home","home-8",1],["away","away-8",1],["home","home-3",0],["away","away-5",1]];
   pk.forEach(([t,p,ok],i)=>d.events.push(ev("k"+i,ok?"pso_goal":"pso_miss",t,"PK",120,0,p)));
   d.stats=testStats(d,true,120);return d};
 const TEST_B=()=>{const P2=(t,l)=>P(t,l);const d={teams:{
-    home:{name:"リヴァーポート",color:"#f2f2f2",formation:"3-4-2-1",players:P2("home",[
+    home:{name:"リヴァーポート",color:"#f2f2f2",numColor:"#c8102e",gkColor:"#ff7a1a",gkNum:"#111111",formation:"3-4-2-1",players:P2("home",[
       [31,"オーウェン","G"],[4,"ハリス","D"],[5,"コール","D"],[6,"ブレイク","D"],[2,"ウォード","M"],[8,"フィンチ","M"],[14,"ケイン","M"],[3,"モス","M"],[7,"リード","M"],[10,"アシュトン","M"],[9,"グレイ","F"],
       [1,"パイク","G"],[11,"ドレイク","F"],[15,"ヘイズ","D"],[17,"ノックス","M"],[18,"ベイリー","F"],[20,"クロス","F"],[22,"ストーン","D"],[24,"ライト","M"]])},
-    away:{name:"モンテ・ロッソ",color:"#7a1f3d",formation:"4-4-2",players:P2("away",[
+    away:{name:"モンテ・ロッソ",color:"#7a1f3d",numColor:"#f5d76e",gkColor:"#7cc6e8",gkNum:"#111111",formation:"4-4-2",players:P2("away",[
       [12,"ロッシ","G"],[2,"コンティ","D"],[3,"ガッリ","D"],[5,"モレッティ","D"],[13,"リーヴァ","D"],[7,"ビアンキ","M"],[6,"ロマーノ","M"],[8,"エスポジト","M"],[11,"マリーニ","M"],[9,"ロンバルディ","F"],[10,"フォンタナ","F"],
       [1,"サルヴィ","G"],[4,"テスタ","D"],[14,"ヴィターレ","D"],[15,"カルボーネ","M"],[16,"ペッレグリーニ","M"],[17,"ジェンティーレ","F"],[18,"ファリーナ","M"],[19,"モンティ","F"],[20,"グレコ","D"],[21,"ルッソ","M"],[23,"ベネデッティ","F"],[99,"コロンボ","G"]])}},
   events:[
     ev("b1","goal","away","1H",2,0,"away-9",{assist:"away-10"}),ev("b2","yellow","home","1H",12,0,"home-5"),
     ev("b3","og","away","1H",27,0,"away-3"),ev("b4","goal","home","1H",34,0,"home-10",{assist:"home-7"}),
-    ev("b5","red","away","1H",44,0,"away-6"),ev("b6","yellow","away","1H",45,3,"away-8"),
+    ev("b5","red","away","1H",44,0,"away-6",{why:"Professional foul"}),ev("b6","yellow","away","1H",45,3,"away-8"),
     ev("b7","sub","home","2H",52,0,"home-9",{playerIn:"home-18"}),ev("b8","red","home","2H",63,0,"home-5"),
     ev("b9","sub","home","2H",67,0,"home-18",{playerIn:"home-20"}),ev("b10","goal","away","2H",74,0,"away-9",{assist:"away-11"}),
-    ev("b11","goal","away","2H",77,0,"away-9"),ev("b12","sub","away","2H",80,0,"away-10",{playerIn:"away-17"}),
+    ev("b10v","var","away","2H",76,0,"away-9",{note:"Penalty confirmed"}),ev("b11","goal","away","2H",77,0,"away-9",{pen:true}),ev("b12","sub","away","2H",80,0,"away-10",{playerIn:"away-17"}),
     ev("b13","sub","home","2H",80,0,"home-8",{playerIn:"home-11"}),ev("b14","yellow","away","2H",86,0,"away-17"),
     ev("b15","goal","home","2H",90,5,"home-10",{assist:"home-7"})]};
   d.stats=testStats(d,false,90);return d};
@@ -575,6 +594,8 @@ const $=id=>document.getElementById(id);
 /* team logos: API-Football image URL built from the team id (no API request). Hidden if it can't load (offline etc.) */
 const logoUrl=id=>id?`https://media.api-sports.io/football/teams/${encodeURIComponent(id)}.png`:"";
 const logo=id=>id?`<img class="logo" src="${logoUrl(id)}" alt="" loading="lazy">`:"";
+/* competition logos, built from the league id the same way (no API request) */
+const lgLogo=id=>id?`<img class="logo lgo" src="https://media.api-sports.io/football/leagues/${encodeURIComponent(id)}.png" alt="" loading="lazy">`:"";
 document.addEventListener("error",e=>{const t=e.target;if(!t||!t.classList)return;if(t.classList.contains("logo"))t.hidden=true;
   else if(t.classList.contains("face"))faceFail(t)},true);
 /* player photos: built from the API player id like the team logos (no API request); failures fall back to number / no photo */
@@ -636,10 +657,11 @@ function compute(t){const idx=ord(t);
     else if(e.type==="red"){const k=sl.indexOf(e.player);if(k>=0)sl[k]=null;
       /* a red after a yellow in the same match (or flagged by the API) is shown as a second yellow */
       const m=mk(e.player),two=!!e.second||m.y>0;m.r=two?2:1;if(two)st.y2.add(e.id);
-      (st.reds[e.team]||[]).push(e.player);tag(e.player,"red","退場 "+lab,two?CARD_Y+CARD_Y:CARD_R)}
-    else if(e.type==="yellow"){mk(e.player).y++;tag(e.player,"yc","警告 "+lab,CARD_Y)}
-    else if(e.type==="goal"){st.score[e.team]++;mk(e.player).g++;tag(e.player,"goal","得点 "+lab);if(e.assist){mk(e.assist).a++;tag(e.assist,"goal","アシスト "+lab)}}
+      (st.reds[e.team]||[]).push(e.player);tag(e.player,"red","退場 "+lab+(e.why?"("+whyJa(e.why)+")":""),two?CARD_Y+CARD_Y:CARD_R)}
+    else if(e.type==="yellow"){mk(e.player).y++;tag(e.player,"yc","警告 "+lab+(e.why?"("+whyJa(e.why)+")":""),CARD_Y)}
+    else if(e.type==="goal"){st.score[e.team]++;mk(e.player).g++;tag(e.player,"goal",(e.pen?"得点(PK) ":"得点 ")+lab);if(e.assist){mk(e.assist).a++;tag(e.assist,"goal","アシスト "+lab)}}
     else if(e.type==="og"){st.score[e.team==="home"?"away":"home"]++;tag(e.player,"","OG "+lab)}
+    else if(e.type==="pen_miss")tag(e.player,"","PK失敗 "+lab);
     else if(e.type==="pso_goal"){st.pk[e.team]++;st.pkUsed=true}
     else if(e.type==="pso_miss")st.pkUsed=true;
     st.log.push(e);
@@ -707,7 +729,7 @@ function render(){
     list.forEach((p,i)=>{const row=Math.floor(i/BENCH_CAP),k=i%BENCH_CAP;
       const d=(BENCH_GAP+k*BENCH_STEP)*(t===left?-1:1);
       const o=BENCH_POS[p.id]||{x:52.5+d,y:BENCH_Y0+row*BENCH_DY};
-      g+=tokenSvg(p,t,o,{...opt,bench:true,gone:used.has(p.id),tier:k%2,attr:`data-bench="${esc(p.id)}"`});
+      g+=tokenSvg(p,t,o,{...opt,bench:true,gk:p.pos==="G",gone:used.has(p.id),tier:k%2,attr:`data-bench="${esc(p.id)}"`});
     });
   });
   svg.setAttribute("viewBox",`-4 -6 113 ${benchBottom(rows)+10}`);
@@ -726,7 +748,7 @@ function render(){
   if(!st.log.length&&!markers(st).length){$("log").innerHTML=`<p class="empty">まだ反映された出来事はありません。</p>`}
   else{
     const n=id=>pm[id]?`<span class="pn" data-pinfo="${esc(id)}">${esc(pShort(pm[id]))}</span>`:"?";
-    const evHtml=e=>{const cards=e.type==="yellow"?CARD_Y:e.type==="red"?(st.y2.has(e.id)?CARD_Y+CARD_Y:CARD_R):"";const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="goal"&&e.assist?`${n(e.player)}(A ${n(e.assist)})`:n(e.player);
+    const evHtml=e=>{const cards=e.type==="yellow"?CARD_Y:e.type==="red"?(st.y2.has(e.id)?CARD_Y+CARD_Y:CARD_R):"";const nt=evNote(e),txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="var"?`${esc(nt)}${e.player?" "+n(e.player):""}`:(e.type==="goal"&&e.assist?`${n(e.player)}(A ${n(e.assist)})`:n(e.player))+(nt?`<small class="evn">(${esc(nt)})</small>`:"");
       return `<div class="ev"><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span><span>${cards}${txt}</span></div>`};
     /* shoot-out: one row per round (n-th kick of each side) */
     const pkN={home:0,away:0};
@@ -844,18 +866,21 @@ function ratingSvg(v){if(!v)return "";const c=v>=8?"#1f8a52":v>=7?"#3d7fbf":v>=6
   return `<g pointer-events="none"><rect x="-4.6" y="-4.3" width="3.6" height="2.2" rx=".5" fill="${c}" stroke="rgba(0,0,0,.4)" stroke-width=".15"/>
     <text x="-2.8" y="-2.65" text-anchor="middle" font-size="1.55" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="#fff">${v.toFixed(1)}</text></g>`}
 function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier,rt}){
-  const col=S.data.teams[t].color,fg=textOn(col),fu=showF&&faceUrl(p),face=!!fu&&!FACE_BAD.has(fu),bg=gk?"#e9e4d6":col,sh=pShort(p),m=marks[p.id];
+  const T=S.data.teams[t],col=T.color,fu=showF&&faceUrl(p),face=!!fu&&!FACE_BAD.has(fu),bg=gk?(T.gkColor||"#e9e4d6"):col,sh=pShort(p),m=marks[p.id];
+  const fg=numOn(bg,gk?T.gkNum:T.numColor);
   const sc=bench?BENCH_SC:1,ly=bench?(tier?7.1:4.7):4.9;
   return `<g class="pl${gone?" gone":""}" data-team="${t}" data-pid="${esc(p.id)}" ${attr} data-sc="${sc}" transform="translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})${sc!==1?` scale(${sc})`:""}" style="cursor:grab"${gone?` opacity=".45"`:""}>
     <circle r="3.4" fill="transparent"/>
     ${gk?`<circle r="2.95" fill="none" stroke="${col}" stroke-width=".45"/>`:""}
     <circle class="pbg" r="2.4" fill="${face?"#dfe2dc":bg}" data-fill="${bg}" stroke="rgba(0,0,0,.45)" stroke-width=".25"/>
-    <text class="pnum"${face?` visibility="hidden"`:""} y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${gk?"#111":fg}">${esc(p.num)}</text>
+    <text class="pnum"${face?` visibility="hidden"`:""} y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${fg}">${esc(p.num)}</text>
     ${face?`<image class="face" href="${esc(fu)}" x="-2.3" y="-2.3" width="4.6" height="4.6" clip-path="url(#fc)" preserveAspectRatio="xMidYMin slice" pointer-events="none"/><circle class="facering" r="2.4" fill="none" stroke="${col}" stroke-width=".55"/>`:""}
     ${markSvg(m,showM)}
     ${rt?ratingSvg(rt[p.id]):""}
     <text class="pname" data-plain="${esc(sh)}" y="${ly}" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(face&&p.num!==""?p.num+" "+sh:sh)}</text>
   </g>`}
+/* kit number colour when it stands out from the shirt colour, else black / white */
+function numOn(bg,want){return want&&/^#[0-9a-f]{6}$/i.test(want)&&/^#[0-9a-f]{6}$/i.test(bg)&&cdist(want,bg)>=110?want:textOn(bg)}
 function marksOn(){try{return localStorage.getItem("tacboard.marks")!=="false"}catch(e){return true}}
 function markSvg(m,all){if(!m)return "";let o="";
   const card=(c,dx,rot)=>`<rect x="${2.05+dx}" y="-3.3" width="1.2" height="1.65" rx=".2" fill="${c}" stroke="rgba(0,0,0,.55)" stroke-width=".18" transform="rotate(${rot} ${2.65+dx} -2.5)"/>`;
@@ -1004,6 +1029,7 @@ function teamEditor(t){
     <div class="row2">
       <label class="field">チーム名<input id="ed-${t}-name" value="${esc(T.name)}"></label>
       <label class="field">色<input type="color" id="ed-${t}-color" value="${esc(T.color)}" style="padding:2px;height:36px"></label>
+      <label class="field">GKの色<input type="color" id="ed-${t}-gkc" value="${esc(T.gkColor||"#e9e4d6")}" style="padding:2px;height:36px"></label>
       <label class="field">システム<input id="ed-${t}-fm" value="${esc(T.formation)}" placeholder="4-2-3-1"></label>
     </div>
     <label class="field">選手(1行に「背番号 名前」)<textarea id="ed-${t}-pl" spellcheck="false">${esc(st+"\n---\n"+bn)}</textarea></label>
@@ -1025,6 +1051,7 @@ function renderEditor(){
   ["home","away"].forEach(t=>{
     $(`ed-${t}-name`).onchange=e=>{S.data.teams[t].name=e.target.value;commit()};
     $(`ed-${t}-color`).oninput=e=>{S.data.teams[t].color=e.target.value;commit(false)};
+    $(`ed-${t}-gkc`).oninput=e=>{S.data.teams[t].gkColor=e.target.value;commit(false)};
     $(`ed-${t}-fm`).onchange=e=>{S.data.teams[t].formation=e.target.value.trim();commit()};
     $(`ed-${t}-pl`).onchange=e=>{S.data.teams[t].players=parsePl(t,e.target.value);commit()};
   });
@@ -1045,7 +1072,7 @@ function renderEvRows(){
   const rows=S.data.events.map((e,o)=>({e,o,i:evOrd(e)})).sort((a,b)=>a.i-b.i||a.o-b.o);
   $("evRows").innerHTML=rows.length?rows.map(({e})=>{
     const n=id=>pm[id]?pm[id].num+" "+pm[id].name:"(不明)";
-    const txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="goal"&&e.assist?`${n(e.player)}(アシスト ${n(e.assist)})`:n(e.player);
+    const nt=evNote(e),txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="var"?nt+(e.player?" "+n(e.player):""):(e.type==="goal"&&e.assist?`${n(e.player)}(アシスト ${n(e.assist)})`:n(e.player))+(nt?`(${nt})`:"");
     return `<tr><td>${esc(evLabel(e))}</td><td><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span></td><td>${esc(T[e.team].name)}</td><td>${esc(txt)}</td><td style="text-align:right"><button class="del" data-del="${esc(e.id)}">削除</button></td></tr>`}).join("")
     :`<tr><td colspan="5" class="empty">出来事はまだありません。</td></tr>`;
 }
@@ -1206,7 +1233,7 @@ function renderFixtures(list){
   const rows=list.filter(f=>all||sel.includes(f.league.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
   noteTeams(rows.flatMap(f=>{const lg=lgName(f.league.id,f.league.name);return [[f.teams.home,lg],[f.teams.away,lg]]}));
   $("fList").innerHTML=rows.length?rows.map(f=>`<li><span class="ko">${esc(f.fixture.date.slice(11,16))}</span>
-      <span class="vs"><span class="lg">${esc(lgName(f.league.id,f.league.name))}</span>${star(f.teams.home)}${logo(f.teams.home.id)}${esc(tName(f.teams.home.id,f.teams.home.name))} vs ${star(f.teams.away)}${logo(f.teams.away.id)}${esc(tName(f.teams.away.id,f.teams.away.name))}</span>
+      <span class="vs"><span class="lg">${lgLogo(f.league.id)}${esc(lgName(f.league.id,f.league.name))}</span>${star(f.teams.home)}${logo(f.teams.home.id)}${esc(tName(f.teams.home.id,f.teams.home.name))} vs ${star(f.teams.away)}${logo(f.teams.away.id)}${esc(tName(f.teams.away.id,f.teams.away.name))}</span>
       <button class="ghost" data-fx="${f.fixture.id}">読み込む</button></li>`).join("")
     :`<li style="display:block" class="empty">該当する試合はありません。リーグの選択や日付を変えてみてください。</li>`;
 }
@@ -1244,8 +1271,10 @@ function convert(fx,lineups,events){
     const subs=(L.substitutes||[]).map(x=>x.player);
     const co=L.coach&&L.coach.id!=null?{id:L.coach.id,name:L.coach.name||""}:null;
     const mk=(p,starter)=>({id:s+"-"+(p.id!=null?p.id:"n"+p.number),apiId:p.id,num:p.number!=null?String(p.number):"",name:p.name||"?",...(/^[GDMF]$/.test(p.pos||"")?{pos:p.pos}:{}),starter});
-    const col=L.team&&L.team.colors&&L.team.colors.player;
-    teams[s]={name:tm.name,apiId:tm.id,color:hex(col&&col.primary)||(s==="home"?"#c8432f":"#2d63c4"),
+    const col=L.team&&L.team.colors&&L.team.colors.player,gc=L.team&&L.team.colors&&L.team.colors.goalkeeper;
+    /* kit colours from lineups: shirt number colour, goalkeeper shirt and number */
+    const kit={...(hex(col&&col.number)?{numColor:hex(col.number)}:{}),...(hex(gc&&gc.primary)?{gkColor:hex(gc.primary)}:{}),...(hex(gc&&gc.number)?{gkNum:hex(gc.number)}:{})};
+    teams[s]={name:tm.name,apiId:tm.id,color:hex(col&&col.primary)||(s==="home"?"#c8432f":"#2d63c4"),...kit,
       formation:L.formation||"4-4-2",...(co?{coach:co}:{}),players:[...xi.map(p=>mk(p,true)),...subs.map(p=>mk(p,false))]};
   });
   if(cdist(teams.home.color,teams.away.color)<90){
@@ -1264,20 +1293,21 @@ function convert(fx,lineups,events){
     let s=side[e.team&&e.team.id];const base={id:"a"+(n++),period,min:el,add:ex};
     const type=String(e.type||"").toLowerCase(),det=String(e.detail||"").toLowerCase();
     if(type==="goal"){
-      if(det.includes("missed")){if(pso&&s)out.push({...base,type:"pso_miss",team:s,player:find(s,e.player)});return}
+      if(det.includes("missed")){if(s)out.push({...base,type:pso?"pso_miss":"pen_miss",team:s,player:find(s,e.player)});return}
       if(det.includes("own")){const ps=whose(e.player)||s;if(ps)out.push({...base,type:"og",team:ps,player:find(ps,e.player)});return}
-      if(s){const g={...base,type:pso?"pso_goal":"goal",team:s,player:find(s,e.player)};
+      if(s){const g={...base,type:pso?"pso_goal":"goal",team:s,player:find(s,e.player)};if(!pso&&det.includes("penalty"))g.pen=true;
         const a=!pso&&e.assist&&(e.assist.id!=null||e.assist.name)?find(s,e.assist):null;if(a&&a!==g.player)g.assist=a;out.push(g)}
     }else if(type==="card"&&s&&!pso){
       const yc=det.includes("yellow")&&!det.includes("second");
-      out.push({...base,type:yc?"yellow":"red",team:s,player:find(s,e.player),...(det.includes("second")?{second:true}:{})});
+      const why=String(e.comments||"").trim();
+      out.push({...base,type:yc?"yellow":"red",team:s,player:find(s,e.player),...(det.includes("second")?{second:true}:{}),...(why?{why}:{})});
       if(!(det.includes("yellow")&&!det.includes("second")))on[s].delete(find(s,e.player));
     }else if(type==="subst"&&s){
       let o=find(s,e.player),i=find(s,e.assist);
       if(o&&i&&!on[s].has(o)&&on[s].has(i))[o,i]=[i,o];
       if(!o||!i)return;on[s].delete(o);on[s].add(i);
       out.push({...base,type:"sub",team:s,player:o,playerIn:i});
-    }
+    }else if(type==="var"&&s&&!pso&&e.detail){const v={...base,type:"var",team:s,note:String(e.detail)};const pl=find(s,e.player);if(pl)v.player=pl;out.push(v)}
   });
   return {fixture:fx.fixture.id,info:fxInfo(fx),kickoff:fx.fixture.timestamp?fx.fixture.timestamp*1000:null,season:fx.league&&fx.league.season||null,teams,events:out};
 }
@@ -1338,8 +1368,8 @@ function renderPinfo(){const pm=pmap(),p=pm[PC_PID];if(!p){closePinfo();return}
   let solo=false;
   if(src&&src.st&&src.st.length){const rows=src.st;
     const sum=rows.reduce((a,r)=>a.map((v,i)=>v+(+r[i+3]||0)),[0,0,0,0,0,0,0,0]);
-    const tr=(name,v,cls)=>`<tr${cls?` class="${cls}"`:""}><td>${esc(name)}</td><td>${v[0]}</td><td>${v[1]}</td><td>${v[2]}</td><td>${v[3]}</td><td>${v[4]}</td><td>${v[5]}</td><td>${v[6]+v[7]}</td></tr>`;
-    const lname=r=>lgName(r[0],r[1])+(r[2]&&r[2]!==T.apiId&&r[11]?`(${tName(r[2],r[11])})`:"");
+    const tr=(name,v,cls)=>`<tr${cls?` class="${cls}"`:""}><td>${name}</td><td>${v[0]}</td><td>${v[1]}</td><td>${v[2]}</td><td>${v[3]}</td><td>${v[4]}</td><td>${v[5]}</td><td>${v[6]+v[7]}</td></tr>`;
+    const lname=r=>lgLogo(r[0])+esc(lgName(r[0],r[1])+(r[2]&&r[2]!==T.apiId&&r[11]?`(${tName(r[2],r[11])})`:""));
     h+=`<p class="pcnote" style="margin:0 0 4px">${past?sl+" シーズンの成績":"今シーズンの成績"}</p>
       <div class="pcwrap"><table class="pcst"><thead><tr><th>大会</th><th>出場</th><th>先発</th><th>分</th><th>得点</th><th>アシスト</th><th>警告</th><th>退場</th></tr></thead><tbody>
       ${rows.map(r=>tr(lname(r),r.slice(3))).join("")}${rows.length>1?tr("公式戦合計",sum,"tot"):""}</tbody></table></div>
@@ -1422,7 +1452,7 @@ function renderMinfo(){const d=S.data,T=d.teams,i=d.info||{},ko=kickoffOf(d);
   const ref=i.referee?i.referee.split(",").map(x=>x.trim()):null;
   const wx=i.wx;
   h+=`<dl class="pcprof">
-    ${lg?`<dt>大会</dt><dd>${esc(lg)}${i.round?" "+esc(roundJa(i.round)):""}</dd>`:""}
+    ${lg?`<dt>大会</dt><dd>${lgLogo(i.lgId)}${esc(lg)}${i.round?" "+esc(roundJa(i.round)):""}</dd>`:""}
     ${ko&&d.kickoff?`<dt>キックオフ</dt><dd>${esc(new Date(ko+9*3600e3).toISOString().slice(0,16).replace("T"," ").replace(/-/g,"/"))}(日本時間)</dd>`:""}
     ${i.venue||i.city?(()=>{const v=JA&&venueJa(i.venueId,i.venue);const vn=v?v[0]:i.venue,cn=v&&v[2]||i.city;return `<dt>会場</dt><dd>${esc(vn&&cn?vn+"("+cn+")":vn||cn)}</dd>`})():""}
     <dt>主審</dt><dd>${ref?esc(JA&&refJa(ref[0])||ref[0])+(ref[1]?`(${esc(NAT_JA[ref[1]]||ref[1])})`:""):"–"}</dd>
@@ -1529,7 +1559,7 @@ function touchRecent(d){const id=entryId(d);if(!id)return;const rec=ls.get("tacb
   if(r){r.at=Date.now();ls.set("tacboard.recent",rec)}}
 function storeMatch(f,data){
   ls.set("tacboard.match."+f.fixture.id,data);
-  putRecent({id:String(f.fixture.id),date:f.fixture.date.slice(0,10),label:`${f.teams.home.name} vs ${f.teams.away.name}`,lg:LG_NAME[f.league.id]||f.league.name,at:Date.now(),
+  putRecent({id:String(f.fixture.id),date:f.fixture.date.slice(0,10),label:`${f.teams.home.name} vs ${f.teams.away.name}`,lg:LG_NAME[f.league.id]||f.league.name,lgId:f.league.id,at:Date.now(),
     home:{id:f.teams.home.id,name:f.teams.home.name},away:{id:f.teams.away.id,name:f.teams.away.name}});
 }
 const isDone=f=>f.done!=null?f.done:["FT","AET","PEN"].includes(f.fixture.status&&f.fixture.status.short);
@@ -1555,10 +1585,12 @@ function closeFinder(){setTimeout(()=>{$("finder").open=false;window.scrollTo({t
 $("fList").addEventListener("click",e=>{
   const st=e.target.closest("[data-star]");if(st){toggleTeam(+st.dataset.star,st.dataset.name);return}
   const b=e.target.closest("[data-fx]");if(b)loadFixture(+b.dataset.fx)});
+/* league id of a saved match: kept on the list item, or (older items) taken from the saved match info */
+function recentLg(r){if(r.lgId)return r.lgId;const d=ls.get("tacboard.match."+r.id,null);return d&&d.info&&d.info.lgId||null}
 function renderRecent(){
   const rec=ls.get("tacboard.recent",[]);$("fRecentBox").hidden=!rec.length;
   $("fRecent").innerHTML=rec.map(r=>`<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}</span>
-    <span class="vs"><span class="lg">${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${r.home&&r.away?`${star(r.home)}${logo(r.home.id)}${esc(tName(r.home.id,r.home.name))} vs ${star(r.away)}${logo(r.away.id)}${esc(tName(r.away.id,r.away.name))}`:esc(r.label)}</span>
+    <span class="vs"><span class="lg">${lgLogo(recentLg(r))}${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${r.home&&r.away?`${star(r.home)}${logo(r.home.id)}${esc(tName(r.home.id,r.home.name))} vs ${star(r.away)}${logo(r.away.id)}${esc(tName(r.away.id,r.away.name))}`:esc(r.label)}</span>
     <span style="display:flex;gap:6px"><button class="ghost" data-open="${esc(r.id)}">開く</button><button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`).join("");
 }
 $("fRecent").addEventListener("click",e=>{
@@ -1570,15 +1602,21 @@ $("fRecent").addEventListener("click",e=>{
 
 /* ---------- export / import of saved matches as a file (for the Files app / iCloud Drive) ---------- */
 const sameContent=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.inj;delete d.kickoff;delete d.season;delete d.info;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach;if(Array.isArray(d.teams[t].players))d.teams[t].players=d.teams[t].players.map(p=>{const q={...p};delete q.pos;return q})}})}const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
+const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.inj;delete d.kickoff;delete d.season;delete d.info;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach;KIT.forEach(k=>delete d.teams[t][k]);if(Array.isArray(d.teams[t].players))d.teams[t].players=d.teams[t].players.map(p=>{const q={...p};delete q.pos;return q})}})}if(Array.isArray(d.events))d.events=baseEvents(d.events);const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
 const pc=o=>{const n=Object.keys(o).length;return n?`と ${n} チームの選手情報`:""};
 /* fill what the saved copy lacks from an imported copy of the same match (injuries, stats, match info, coaches, kickoff, season, positions) */
-function fillExtras(d,src){let ch=false;const has=v=>v!=null&&!(typeof v==="object"&&!Object.keys(v).length);
+/* kit colours and the event details added later (penalty goals, missed penalties, VAR, card reasons) do not make a copy "different" */
+const KIT=["numColor","gkColor","gkNum"];
+const baseEvents=evs=>evs.filter(e=>e.type!=="var"&&e.type!=="pen_miss").map(e=>{const q={...e};delete q.id;delete q.pen;delete q.why;delete q.note;return q});
+const evExtra=evs=>(evs||[]).filter(e=>e.type==="var"||e.type==="pen_miss"||e.pen||e.why).length;
+function fillExtras(d,src){let ch=false;
+  if(Array.isArray(src.events)&&evExtra(src.events)>evExtra(d.events)&&sameContent(baseEvents(src.events),baseEvents(d.events||[]))){d.events=src.events;ch=true}const has=v=>v!=null&&!(typeof v==="object"&&!Object.keys(v).length);
   ["kickoff","season"].forEach(k=>{if(!has(d[k])&&has(src[k])){d[k]=src[k];ch=true}});
   if(has(src.info)){if(!has(d.info)){d.info=src.info;ch=true}else Object.keys(src.info).forEach(k=>{if(!has(d.info[k])&&has(src.info[k])){d.info[k]=src.info[k];ch=true}})}
   if(src.inj&&(!d.inj||(src.inj.at||0)>(d.inj.at||0))){d.inj=src.inj;ch=true}
   if(has(src.stats)){if(!has(d.stats)){d.stats=src.stats;ch=true}else Object.keys(src.stats).forEach(k=>{if(!has(d.stats[k])&&has(src.stats[k])){d.stats[k]=src.stats[k];ch=true}})}
   ["home","away"].forEach(t=>{const a=d.teams&&d.teams[t],b=src.teams&&src.teams[t];if(a&&b&&!a.coach&&b.coach){a.coach=b.coach;ch=true}
+    if(a&&b)KIT.forEach(k=>{if(!a[k]&&b[k]){a[k]=b[k];ch=true}});
     if(a&&b&&Array.isArray(a.players)&&Array.isArray(b.players))a.players.forEach(p=>{const q=b.players.find(x=>x.id===p.id);if(!p.pos&&q&&q.pos){p.pos=q.pos;ch=true}})});
   return ch}
 /* merge imported player-info snapshots: newest per season (single-player fetches of the older one are kept), newest PI_KEEP */
@@ -1595,7 +1633,7 @@ function mergePinfo(all){let n=0;const idx=ls.get("tacboard.pinfoIdx",{});
 $("fxExport").onclick=async()=>{
   const rec=ls.get("tacboard.recent",[]);
   const items=rec.map(r=>{const data=ls.get("tacboard.match."+r.id,null);if(!data)return null;const shape=ls.get(matchKey(data),null);
-    return {id:String(r.id),date:r.date,label:r.label,lg:r.lg,home:r.home||null,away:r.away||null,at:Math.max(r.at||0,shape&&shape.at||0)||null,copy:r.copy||null,data,shape}}).filter(Boolean);
+    return {id:String(r.id),date:r.date,label:r.label,lg:r.lg,lgId:recentLg(r),home:r.home||null,away:r.away||null,at:Math.max(r.at||0,shape&&shape.at||0)||null,copy:r.copy||null,data,shape}}).filter(Boolean);
   if(!items.length){fmsg("fxMsg","書き出す試合がありません",true);return}
   const now=Date.now(),stamp=new Date(now+9*3600e3).toISOString().slice(0,16).replace(/[-:]/g,"").replace("T","-");
   const pinfo={};Object.keys(ls.get("tacboard.pinfoIdx",{})).forEach(tid=>{const l=piSnaps(tid);if(l.length)pinfo[tid]=l});
@@ -1626,7 +1664,7 @@ $("fxFile").onchange=async e=>{
     ls.set("tacboard.match."+id,data);
     if(incoming.s)ls.set(matchKey(data),{...incoming.s,at});else ls.del(matchKey(data));
     const tm=s=>it[s]&&it[s].id?it[s]:(data.teams[s].apiId?{id:data.teams[s].apiId,name:data.teams[s].name}:null);
-    putRecent({id,date:it.date||"",label:it.label||`${data.teams.home.name} vs ${data.teams.away.name}`,lg:it.lg||"",at,copy,home:tm("home"),away:tm("away")});
+    putRecent({id,date:it.date||"",label:it.label||`${data.teams.home.name} vs ${data.teams.away.name}`,lg:it.lg||"",lgId:it.lgId||data.info&&data.info.lgId||null,at,copy,home:tm("home"),away:tm("away")});
     copy?copies++:added++;
   });
   if(j.pinfoMax&&!piMax())ls.set("tacboard.pinfoMax",j.pinfoMax);
