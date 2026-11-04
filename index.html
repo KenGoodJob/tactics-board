@@ -423,7 +423,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104172402">20261104172402</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104174507">20261104174507</span></p>
 </div>
 
 <script>
@@ -1419,7 +1419,7 @@ function renderInj(){const d=S.data,T=d.teams,box=$("inj");if(!box)return;
   let h="";const inj=d.inj;
   if(inj){h+=`<div class="injg">${["home","away"].map(t=>{const l=inj.list.filter(x=>x.t===t);
       return `<div><h3>${logo(T[t].apiId)}${esc(tName(T[t].apiId,T[t].name))}</h3>${l.length?`<ul class="plist">${l.map(x=>{const pl={apiId:x.id,name:x.name};
-        return `<li><span>${faceImg(pl)}${esc(pName(pl))}</span><span><span class="tag ${x.type==="Questionable"?"q":"mf"}">${esc(INJ_JA[x.type]||x.type||"")}</span> ${esc(REASON_JA[x.reason]||x.reason||"")}</span></li>`}).join("")}</ul>`:`<p class="empty">情報なし</p>`}</div>`}).join("")}</div>
+        return `<li><span><span class="tag ${x.type==="Questionable"?"q":"mf"}">${esc(INJ_JA[x.type]||x.type||"")}</span> ${faceImg(pl)}${esc(pName(pl))}</span><span>${esc(REASON_JA[x.reason]||x.reason||"")}</span></li>`}).join("")}</ul>`:`<p class="empty">情報なし</p>`}</div>`}).join("")}</div>
       <p class="pcnote">${fmtAt(inj.at)} 取得。試合前に発表された情報です(大会やチームによっては載らないことがあります)。</p>`}
   else h+=`<p class="empty">まだ取得していません。</p>`;
   h+=`<p class="stfoot"><button class="ghost" id="injFetch"${INJ_BUSY?" disabled":""}>${INJ_BUSY?"取得しています…":inj?"取り直す":"欠場者を取得"}</button><span>(API 1回)</span></p>`;
