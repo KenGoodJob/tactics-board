@@ -82,7 +82,11 @@ img.face{width:24px;height:24px;border-radius:50%;object-fit:cover;object-positi
 .status b{color:var(--pending)}
 
 /* board */
-.boardbox{background:var(--board-edge);border-radius:12px;padding:10px;overflow:hidden}
+.boardbox{position:relative;background:var(--board-edge);border-radius:12px;padding:10px;overflow:hidden}
+.tacbar{position:absolute;top:6px;right:6px;display:flex;gap:6px;z-index:2}
+.tacbtn{font:inherit;font-size:12px;line-height:1.2;padding:5px 11px;border-radius:999px;border:1px solid rgba(255,255,255,.55);background:rgba(0,0,0,.45);color:#fff;cursor:pointer;touch-action:manipulation}
+.tacbtn[aria-pressed="true"]{background:#ffd21f;border-color:#ffd21f;color:#111;font-weight:600}
+.tacbtn:disabled{opacity:.4;cursor:default}
 svg#board{display:block;width:100%;height:auto;touch-action:none;user-select:none;-webkit-user-select:none}
 .ghost{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:6px 14px;font-size:14px}
 .possbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
@@ -295,7 +299,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <div class="status" id="status"></div>
   </section>
 
-  <div class="boardbox" id="secBoard"><svg id="board" viewBox="-4 -6 113 94" aria-label="戦術ボード"></svg></div>
+  <div class="boardbox" id="secBoard"><div class="tacbar"><button class="tacbtn" id="tacUndo" hidden>1本戻す</button><button class="tacbtn" id="tacBtn" aria-pressed="false">戦術モード</button></div><svg id="board" viewBox="-4 -6 113 94" aria-label="戦術ボード"></svg></div>
 
   <div class="possbar" id="secPoss">
     <span class="plabel">配置パターン</span>
@@ -428,7 +432,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104224426">20261104224426</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105013119">20261105013119</span></p>
 </div>
 
 <script>
@@ -705,7 +709,7 @@ function render(){
     });
   });
   svg.setAttribute("viewBox",`-4 -6 113 ${benchBottom(rows)+10}`);
-  $("board").innerHTML=PITCH+g;
+  $("board").innerHTML=PITCH+g+tacSvg();tacUi();
   // benches / squads
   ["home","away"].forEach(t=>{
     const on=new Set(st.slots[t]);
@@ -760,7 +764,7 @@ function markerHtml(r){const canStats=!!(r.kind&&(S.data.fixture||S.data.stats))
     ${canStats?`<button class="mkb" data-stats="${r.kind}" aria-expanded="${open}">スタッツ ${open?"▾":"▸"}</button>`:""}</div>
     ${canStats&&open?`<div class="mkp">${statsPanel(r.kind)}</div>`:""}`}
 const STAT_JA={"Ball Possession":"ボール保持率","expected_goals":"ゴール期待値(xG)","Total Shots":"シュート","Shots on Goal":"枠内シュート","Shots off Goal":"枠外シュート",
-  "Blocked Shots":"ブロックされたシュート","Shots insidebox":"PA内シュート","Shots outsidebox":"PA外シュート","Corner Kicks":"コーナーキック","Offsides":"オフサイド",
+  "Blocked Shots":"ブロックされたシュート","Shots insidebox":"PA内シュート","Shots outsidebox":"PA外シュート","Corner Kicks":"コーナーキック","Free Kicks":"フリーキック","Goal Kicks":"ゴールキック","Throw In":"スローイン","Offsides":"オフサイド",
   "Fouls":"ファウル","Yellow Cards":"警告","Red Cards":"退場","Goalkeeper Saves":"GKセーブ","Total passes":"パス","Passes accurate":"成功したパス","Passes %":"パス成功率","goals_prevented":"防いだ失点(期待値)"};
 const statNum=v=>{if(v==null)return 0;const n=parseFloat(String(v).replace("%",""));return isNaN(n)?0:n};
 function teamStatsHtml(o){if(!o||!o.home||!o.away)return "";
@@ -934,17 +938,39 @@ function resetBench(t){players(t).forEach(p=>delete BENCH_POS[p.id])}
 /* ---------- drag ---------- */
 const svg=$("board");let drag=null;
 function svgPt(ev){const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY;return pt.matrixTransform(svg.getScreenCTM().inverse())}
+/* ---------- 戦術モード: a movable ball and thick freehand lines. Screen coordinates, kept only in memory; turning it off clears everything ---------- */
+const TAC={on:false,ball:null,lines:[]},TAC_COLOR="#ffd21f",TAC_W=1.1;let tdraw=null;
+const tacPath=pts=>"M"+pts.map(p=>p.x.toFixed(2)+" "+p.y.toFixed(2)).join("L")+(pts.length===1?"l0 0":"");
+function tacSvg(){if(!TAC.on)return "";const b=TAC.ball||{x:52.5,y:34};
+  return `<g class="tacl" pointer-events="none" fill="none" stroke="${TAC_COLOR}" stroke-width="${TAC_W}" stroke-linecap="round" stroke-linejoin="round" opacity=".9">${TAC.lines.map(l=>`<path d="${tacPath(l)}"/>`).join("")}</g>`+
+    `<g class="tball" transform="translate(${b.x.toFixed(2)} ${b.y.toFixed(2)})" style="cursor:grab"><circle r="3" fill="transparent"/><circle r="1.25" fill="#fff" stroke="#111" stroke-width=".25"/><polygon points="0,-.5 .48,-.15 .29,.4 -.29,.4 -.48,-.15" fill="#111"/></g>`}
+function tacUi(){const b=$("tacBtn");b.setAttribute("aria-pressed",TAC.on);b.textContent=TAC.on?"戦術モード オン":"戦術モード";
+  const u=$("tacUndo");u.hidden=!TAC.on;u.disabled=!TAC.lines.length}
+$("tacBtn").addEventListener("click",()=>{TAC.on=!TAC.on;TAC.lines=[];TAC.ball=TAC.on?{x:52.5,y:34}:null;tdraw=null;render()});
+$("tacUndo").addEventListener("click",()=>{TAC.lines.pop();render()});
 svg.addEventListener("pointerdown",ev=>{
-  const g=ev.target.closest(".pl");if(!g)return;ev.preventDefault();
+  if(drag||tdraw)return;
+  const g=ev.target.closest(".pl")||(TAC.on?ev.target.closest(".tball"):null);
+  if(!g){if(!TAC.on)return;ev.preventDefault();const layer=svg.querySelector(".tacl");if(!layer)return;
+    const p=svgPt(ev),el=document.createElementNS("http://www.w3.org/2000/svg","path");layer.appendChild(el);
+    tdraw={pts:[{x:p.x,y:p.y}],el,id:ev.pointerId};el.setAttribute("d",tacPath(tdraw.pts));
+    try{svg.setPointerCapture(ev.pointerId)}catch(e){}return}
+  ev.preventDefault();
   const p=svgPt(ev);const m=/translate\(([-\d.]+) ([-\d.]+)\)/.exec(g.getAttribute("transform"));
   const sc=+g.dataset.sc||1;
-  drag={g,cx:ev.clientX,cy:ev.clientY,moved:false,dx:+m[1]-p.x,dy:+m[2]-p.y,x:+m[1],y:+m[2],suf:sc!==1?` scale(${sc})`:"",ymax:benchBottom(benchRows())+2};g.classList.add("dragging");g.style.cursor="grabbing";
-  svg.appendChild(g);try{svg.setPointerCapture(ev.pointerId)}catch(e){}
+  drag={g,ball:g.classList.contains("tball"),cx:ev.clientX,cy:ev.clientY,moved:false,dx:+m[1]-p.x,dy:+m[2]-p.y,x:+m[1],y:+m[2],suf:sc!==1?` scale(${sc})`:"",ymax:benchBottom(benchRows())+2};g.classList.add("dragging");g.style.cursor="grabbing";
+  if(!drag.ball)svg.appendChild(g);try{svg.setPointerCapture(ev.pointerId)}catch(e){}
 });
-svg.addEventListener("pointermove",ev=>{if(!drag)return;if(!drag.moved&&Math.hypot(ev.clientX-drag.cx,ev.clientY-drag.cy)<8)return;drag.moved=true;const p=svgPt(ev);
+svg.addEventListener("pointermove",ev=>{
+  if(tdraw){if(ev.pointerId!==tdraw.id)return;const p=svgPt(ev),q=tdraw.pts[tdraw.pts.length-1];
+    if(Math.hypot(p.x-q.x,p.y-q.y)<.4)return;tdraw.pts.push({x:p.x,y:p.y});tdraw.el.setAttribute("d",tacPath(tdraw.pts));return}
+  if(!drag)return;if(!drag.moved&&Math.hypot(ev.clientX-drag.cx,ev.clientY-drag.cy)<8)return;drag.moved=true;const p=svgPt(ev);
   drag.x=Math.max(-2,Math.min(107,p.x+drag.dx));drag.y=Math.max(-3,Math.min(drag.ymax,p.y+drag.dy));
   drag.g.setAttribute("transform",`translate(${drag.x.toFixed(2)} ${drag.y.toFixed(2)})${drag.suf}`)});
-function endDrag(ev){if(!drag)return;const g=drag.g;
+function endDrag(ev){
+  if(tdraw){if(ev&&ev.pointerId!==tdraw.id)return;TAC.lines.push(tdraw.pts);tdraw=null;tacUi();return}
+  if(!drag)return;const g=drag.g;
+  if(drag.ball){if(drag.moved)TAC.ball={x:drag.x,y:drag.y};g.classList.remove("dragging");g.style.cursor="grab";drag=null;return}
   if(!drag.moved){g.classList.remove("dragging");g.style.cursor="grab";drag=null;if(ev&&ev.type==="pointerup")openPinfo(g.dataset.pid);return}
   if(g.dataset.bench)BENCH_POS[g.dataset.bench]={x:drag.x,y:drag.y};else shapeOf(g.dataset.team).work[g.dataset.slot]=endView({x:drag.x,y:drag.y});
   g.classList.remove("dragging");g.style.cursor="grab";drag=null;save()}
