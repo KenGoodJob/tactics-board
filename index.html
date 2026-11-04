@@ -66,8 +66,13 @@ img.face{width:24px;height:24px;border-radius:50%;object-fit:cover;object-positi
 .steps{display:flex;gap:6px;flex-wrap:wrap}
 .step{min-width:48px;height:42px;padding:0 8px;border-radius:8px;border:1px solid var(--line);background:var(--bg);font-family:var(--f-display);font-size:19px;font-weight:600;font-variant-numeric:tabular-nums}
 .steps{align-items:center;justify-content:flex-start}
-.tnow{min-width:5.4em;text-align:center;padding:0 6px}
+.tnow{min-width:5.6em;text-align:center;padding:4px 8px;display:flex;flex-direction:column;align-items:center;gap:3px;border:2px solid transparent;border-radius:10px;background:none;font:inherit;color:inherit}
 .tnow .tlabel{min-width:0}
+.tnow:disabled{opacity:1;cursor:default}
+.tnow:not(:disabled){border-color:var(--pending);background:var(--bg);cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.tnow:not(:disabled) .tseg{color:var(--pending);font-weight:700}
+.timebar .trow{justify-content:center}.timebar .steps{justify-content:center}.timebar .chips{justify-content:center}
+.timebar .update{margin-left:0}.timebar .status{text-align:center}
 .segbtn.on{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
 .chips{display:flex;gap:6px;flex-wrap:wrap}
 .segbtn{border:1px solid var(--line);background:var(--bg);border-radius:999px;padding:3px 12px;font-size:13px}
@@ -236,10 +241,10 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
         <button class="step" data-step="-15" aria-label="15分戻す">−15</button>
         <button class="step" data-step="-5" aria-label="5分戻す">−5</button>
         <button class="step" data-step="-1" aria-label="1分戻す">−1</button>
-        <div class="tnow">
-          <div class="tlabel" id="pendLabel">0'</div>
-          <div class="tseg" id="pendSeg">前半</div>
-        </div>
+        <button class="tnow" id="tnow" disabled>
+          <span class="tlabel" id="pendLabel">0'</span>
+          <span class="tseg" id="pendSeg">前半</span>
+        </button>
         <button class="step" data-step="1" aria-label="1分進める">+1</button>
         <button class="step" data-step="5" aria-label="5分進める">+5</button>
         <button class="step" data-step="15" aria-label="15分進める">+15</button>
@@ -377,7 +382,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </div>
     </div>
   </details>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104151914">20261104151914</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104153101">20261104153101</span></p>
 </div>
 
 <script>
@@ -391,7 +396,10 @@ const SEGS=[
   {key:"PK",name:"PK戦"},
   {key:"FT",name:"試合終了"}
 ];
-const PT=k=>k==="PK"||k==="FT";
+const PT=k=>k==="PK"||k==="FT";const MAX_PK=40;
+const isPso=e=>e.type==="pso_goal"||e.type==="pso_miss";
+/* n-th kick of the shoot-out (1-based, in the order of the events) */
+const pkNo=e=>S.data.events.filter(isPso).indexOf(e)+1;
 const MAX_AT=30;
 const TYPE_LABEL={goal:"得点",og:"OG",sub:"交代",yellow:"警告",red:"退場",pso_goal:"PK○",pso_miss:"PK×"};
 const TYPE_COLOR={goal:"#1e6a47",og:"#6b5a2e",sub:"#3a5f9e",yellow:"#b8901a",red:"#b23a2e",pso_goal:"#1e6a47",pso_miss:"#6c6c6c"};
@@ -534,7 +542,7 @@ const segI=k=>SEGS.findIndex(s=>s.key===k);
 function lower(s){return s.start}
 function norm(t){
   const i=segI(t.seg);const s=SEGS[i];
-  if(!s||PT(s.key))return {seg:s?s.key:"PK",min:0,add:0};
+  if(!s||PT(s.key)){const k=s?s.key:"PK";return {seg:k,min:0,add:k==="PK"?Math.max(0,Math.min(MAX_PK,Math.round(+t.add||0))):0}}
   let min=Math.round(+t.min||0),add=Math.round(+t.add||0);
   if(min>s.end){add+=min-s.end;min=s.end}
   if(add>0)min=s.end;
@@ -542,15 +550,15 @@ function norm(t){
   return {seg:s.key,min,add:Math.max(0,add)};
 }
 function ord(t){t=norm(t);return segI(t.seg)*100000+t.min*100+t.add}
-function tLabel(t){t=norm(t);if(PT(t.seg))return SEGS[segI(t.seg)].name;if(t.seg==="1H"&&t.min===0)return "0'";return t.add?t.min+"+"+t.add+"'":t.min+"'"}
-function tSeg(t){t=norm(t);if(t.seg==="FT")return "全て反映";if(t.seg==="1H"&&t.min===0)return "キックオフ";const s=SEGS[segI(t.seg)];return s.name+(t.add?" AT":"")}
-function evTime(e){return (e.type==="pso_goal"||e.type==="pso_miss")?{seg:"PK",min:0,add:0}:{seg:e.period,min:e.min,add:e.add}}
+function tLabel(t){t=norm(t);if(t.seg==="PK"&&t.add)return t.add+"本目";if(PT(t.seg))return SEGS[segI(t.seg)].name;if(t.seg==="1H"&&t.min===0)return "0'";return t.add?t.min+"+"+t.add+"'":t.min+"'"}
+function tSeg(t){t=norm(t);if(t.seg==="FT")return "全て反映";if(t.seg==="PK")return "PK戦";if(t.seg==="1H"&&t.min===0)return "キックオフ";const s=SEGS[segI(t.seg)];return s.name+(t.add?" AT":"")}
+function evTime(e){return isPso(e)?{seg:"PK",min:0,add:pkNo(e)}:{seg:e.period,min:e.min,add:e.add}}
 const evOrd=e=>ord(evTime(e));
 const evLabel=e=>{const t=norm(evTime(e));return t.seg==="PK"?"PK":tLabel(t)};
 function step(n){
   let t=norm(S.pending);const i=segI(t.seg);
   if(t.seg==="FT"){if(n<0)t={seg:"PK",min:0,add:0};S.pending=t;return}
-  if(t.seg==="PK"){if(n<0)t={seg:"ET2",min:120,add:0};S.pending=t;return}
+  if(t.seg==="PK"){t=n<0&&t.add===0?{seg:"ET2",min:120,add:0}:{seg:"PK",min:0,add:Math.max(0,Math.min(MAX_PK,t.add+n))};S.pending=t;return}
   const s=SEGS[i];const v=t.min+t.add+n;
   if(v>s.end)t={seg:s.key,min:s.end,add:Math.min(v-s.end,MAX_AT)};
   else if(v<lower(s))t=i>0?{seg:SEGS[i-1].key,min:SEGS[i-1].end,add:0}:kick();
@@ -628,9 +636,9 @@ function render(){
   $("redsH").innerHTML=CARD_R.repeat(st.reds.home.length);$("redsA").innerHTML=CARD_R.repeat(st.reds.away.length);
   $("redsH").title=$("redsA").title="退場";
   $("pkScore").hidden=!st.pkUsed;$("pkScore").textContent="PK "+st.pk.home+" – "+st.pk.away;
-  const ap=norm(S.applied);$("appliedClock").textContent=(ap.seg==="1H"&&ap.min===0)?"キックオフ":PT(ap.seg)?tLabel(ap):tSeg(ap)+" "+tLabel(ap);
+  const ap=norm(S.applied);$("appliedClock").textContent=(ap.seg==="1H"&&ap.min===0)?"キックオフ":ap.seg==="FT"?tLabel(ap):ap.seg==="PK"?"PK戦"+(ap.add?" "+tLabel(ap):""):tSeg(ap)+" "+tLabel(ap);
   // board: pitch players, then the bench strip under the pitch (subs nearest the halfway line, players who left after them, faded)
-  let g="";const showM=marksOn(),showF=facesOn(),opt={showM,showF,marks:st.marks};
+  let g="";const showM=marksOn(),showF=facesOn(),opt={showM,showF,marks:st.marks,rt:ratingMap()};
   ["home","away"].forEach(t=>{
     st.slots[t].forEach((pid,s)=>{
       if(!pid)return;const p=pm[pid];if(!p)return;
@@ -671,9 +679,12 @@ function render(){
     /* shoot-out: one row per round (n-th kick of each side) */
     const pkN={home:0,away:0};
     const rows=[];st.log.forEach(e=>{let k=evOrd(e),label=evLabel(e);
-      if(e.type==="pso_goal"||e.type==="pso_miss"){const n=++pkN[e.team];k+=n;label="PK "+n;}
+      const tt=norm(evTime(e));
+      if(isPso(e)){const n=++pkN[e.team];k=segI("PK")*100000+n;label="PK "+n;}
       let r=rows.find(x=>x.k===k);
-      if(!r){const tt=norm(evTime(e));r={k,label,t:[tt.seg,tt.min,tt.add].join("|"),home:[],away:[]};rows.push(r)}r[e.team].push(e)});
+      if(!r){r={k,label,t:[tt.seg,tt.min,tt.add].join("|"),home:[],away:[]};rows.push(r)}
+      else if(isPso(e))r.t=[tt.seg,tt.min,tt.add].join("|");
+      r[e.team].push(e)});
     rows.push(...markers(st));rows.sort((a,b)=>a.k-b.k);
     $("log").innerHTML=`<div class="tl">
       <div class="hd h">${esc(tName(T.home.apiId,T.home.name))}${logo(T.home.apiId)}<span class="chip" style="background:${T.home.color}"></span></div><div class="tm hd"></div>
@@ -774,7 +785,13 @@ let BENCH_POS={};
 /* row count depends only on the squad size (+2 spare), so a sending-off never changes the board height */
 function benchRows(){return Math.max(1,...["home","away"].map(t=>Math.ceil((Math.max(0,players(t).length-11)+2)/BENCH_CAP)))}
 function benchBottom(rows){return BENCH_Y0+(rows-1)*BENCH_DY+6.5}
-function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier}){
+/* player ratings (from the full-match player stats) shown only while 試合終了 → スタッツ is open */
+function ratingMap(){const ps=S.data.stats&&S.data.stats.players;if(!ps||!STATS_OPEN.ft||norm(S.applied).seg!=="FT")return null;
+  const m={};["home","away"].forEach(t=>(ps[t]||[]).forEach(x=>{const v=parseFloat(x.rt);if(x.pid&&v>0)m[x.pid]=v}));return m}
+function ratingSvg(v){if(!v)return "";const c=v>=8?"#1f8a52":v>=7?"#3d7fbf":v>=6?"#7a7f86":"#c0503a";
+  return `<g pointer-events="none"><rect x="-4.6" y="-4.3" width="3.6" height="2.2" rx=".5" fill="${c}" stroke="rgba(0,0,0,.4)" stroke-width=".15"/>
+    <text x="-2.8" y="-2.65" text-anchor="middle" font-size="1.55" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="#fff">${v.toFixed(1)}</text></g>`}
+function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier,rt}){
   const col=S.data.teams[t].color,fg=textOn(col),fu=showF&&faceUrl(p),face=!!fu&&!FACE_BAD.has(fu),bg=gk?"#e9e4d6":col,sh=pShort(p),m=marks[p.id];
   const sc=bench?BENCH_SC:1,ly=bench?(tier?7.1:4.7):4.9;
   return `<g class="pl${gone?" gone":""}" data-team="${t}" ${attr} data-sc="${sc}" transform="translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})${sc!==1?` scale(${sc})`:""}" style="cursor:grab"${gone?` opacity=".45"`:""}>
@@ -784,6 +801,7 @@ function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier}){
     <text class="pnum"${face?` visibility="hidden"`:""} y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${gk?"#111":fg}">${esc(p.num)}</text>
     ${face?`<image class="face" href="${esc(fu)}" x="-2.3" y="-2.3" width="4.6" height="4.6" clip-path="url(#fc)" preserveAspectRatio="xMidYMin slice" pointer-events="none"/><circle class="facering" r="2.4" fill="none" stroke="${col}" stroke-width=".55"/>`:""}
     ${markSvg(m,showM)}
+    ${rt?ratingSvg(rt[p.id]):""}
     <text class="pname" data-plain="${esc(sh)}" y="${ly}" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(face&&p.num!==""?p.num+" "+sh:sh)}</text>
   </g>`}
 function marksOn(){try{return localStorage.getItem("tacboard.marks")!=="false"}catch(e){return true}}
@@ -799,7 +817,7 @@ function markSvg(m,all){if(!m)return "";let o="";
 function renderTime(){
   const p=norm(S.pending),a=norm(S.applied),diff=ord(p)!==ord(a);
   $("pendLabel").textContent=tLabel(p);$("pendLabel").classList.toggle("diff",diff);
-  $("pendSeg").textContent=tSeg(p);
+  $("pendSeg").textContent=diff?"タップで更新":tSeg(p);$("tnow").disabled=!diff;$("tnow").setAttribute("aria-label",diff?tLabel(p)+"まで更新":tLabel(p));
   document.querySelectorAll(".segbtn").forEach(b=>b.classList.toggle("on",b.dataset.seg===p.seg));
   $("updateBtn").disabled=!diff;
   $("status").innerHTML=diff?`ボードは <b>${esc(tLabel(a))}</b> の状態です。「更新」で ${esc(tLabel(p))} まで反映します。`
@@ -834,7 +852,7 @@ function renderFmSelects(){
 /* ---------- time controls ---------- */
 $("steps").addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;step(+b.dataset.step);renderTime();save()});
 $("segChips").addEventListener("click",e=>{const b=e.target.closest("[data-seg]");if(!b)return;jump(b.dataset.seg);renderTime();save()});
-$("updateBtn").onclick=()=>{S.applied=norm(S.pending);BENCH_POS={};save();render()};
+$("updateBtn").onclick=$("tnow").onclick=()=>{S.applied=norm(S.pending);BENCH_POS={};save();render()};
 /* tapping a time in 反映済みの出来事 moves the clock back there and applies it (already seen, so nothing new is revealed) */
 $("log").addEventListener("click",e=>{
   const sb=e.target.closest("[data-stats]");if(sb){const k=sb.dataset.stats;STATS_OPEN[k]=!STATS_OPEN[k];STATS_MSG="";render();if(STATS_OPEN[k])fetchStats(k,false);return}
