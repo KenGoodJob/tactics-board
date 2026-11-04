@@ -228,7 +228,7 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .pcwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 .pcst{border-collapse:collapse;font-size:13px;width:100%;white-space:nowrap}
 .pcst th,.pcst td{padding:4px 6px;border-bottom:1px solid var(--line);text-align:right}
-.pcst th:first-child,.pcst td:first-child{text-align:left;white-space:normal;min-width:7em}
+.pcst th:first-child,.pcst td:first-child{text-align:left;white-space:normal;min-width:7em;position:sticky;left:0;background:var(--pcbg,var(--surface));z-index:1}
 .pcst tr.tot td{font-weight:700;border-top:2px solid var(--line)}
 .pcnote{font-size:13px;color:var(--muted);margin:8px 0 0}
 .pcget{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:6px;align-items:flex-start}
@@ -436,7 +436,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105050943">20261105050943</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105052056">20261105052056</span></p>
 </div>
 
 <script>
@@ -551,7 +551,8 @@ function testStats(d,withH1,len){let seed=7;const rnd=(a,b)=>{seed=(seed*16807)%
     ps.forEach(p=>{if(!(p.id in on))return;const min=Math.max(1,Math.min(len,(off[p.id]!=null?off[p.id]:len))-on[p.id]);
       const c=(ty,k)=>d.events.filter(e=>e.type===ty&&e[k]===p.id&&e.period!=="PK").length;
       players[t].push({pid:p.id,name:p.name,min,rt:(rnd(58,85)/10).toFixed(1),g:c("goal","player"),a:c("goal","assist"),sh:rnd(0,4),sot:rnd(0,2),
-        pas:Math.round(min*rnd(25,70)/100),acc:rnd(65,95),kp:rnd(0,3),tk:rnd(0,5),int:rnd(0,3),dw:rnd(1,10),drb:rnd(0,3),fd:rnd(0,3),fc:rnd(0,3),sv:p.num==="1"||/^(31|12|13)$/.test(p.num)?rnd(1,6):null})})});
+        pas:Math.round(min*rnd(25,70)/100),acc:rnd(65,95),kp:rnd(0,3),tk:rnd(0,5),int:rnd(0,3),dw:rnd(1,10),drb:rnd(0,3),fd:rnd(0,3),fc:rnd(0,3),sv:p.pos==="G"?rnd(1,6):null,
+        dt:rnd(3,16),da:rnd(0,5),off:p.pos==="F"?rnd(0,2):0,pw:rnd(0,9)>8?1:0,pc:rnd(0,9)>8?1:0,pm:c("pen_miss","player"),ps:p.pos==="G"?rnd(0,9)>8?1:0:null,gc:p.pos==="G"?rnd(0,3):null})})});
   out.players=players;return out}
 const TESTS=[
   ["a","延長・PK戦(7本目で決着)・GK交代・2枚目の警告・ハットトリック・OG・前半スタッツあり",TEST_A],
@@ -798,7 +799,8 @@ function teamStatsHtml(o){if(!o||!o.home||!o.away)return "";
       <span class="sbar"><i style="width:${ph.toFixed(1)}%;background:${S.data.teams.home.color}"></i><i style="width:${(100-ph).toFixed(1)}%;background:${S.data.teams.away.color}"></i></span></div>`}).join("")}</div>`}
 let PS_TEAM="home",PS_SORT="min";
 const PS_COLS=[["min","分"],["rt","評価"],["g","得点"],["a","アシスト"],["sh","シュート"],["sot","枠内"],["pas","パス"],["acc","成功率"],["kp","キーパス"],
-  ["tk","タックル"],["int","インターセプト"],["dw","デュエル勝"],["drb","ドリブル成功"],["fd","被ファウル"],["fc","ファウル"],["sv","セーブ"]];
+  ["tk","タックル"],["int","インターセプト"],["dw","デュエル勝"],["dt","デュエル"],["drb","ドリブル成功"],["da","ドリブル"],["fd","被ファウル"],["fc","ファウル"],["off","オフサイド"],
+  ["pw","PK獲得"],["pc","PK献上"],["pm","PK失敗"],["sv","セーブ"],["ps","PKセーブ"],["gc","失点"]];
 function playerStatsHtml(ps){if(!ps)return "";const T=S.data.teams,list=(ps[PS_TEAM]||[]).slice(),pm=pmap();
   list.sort((x,y)=>(+y[PS_SORT]||0)-(+x[PS_SORT]||0));
   const nm=r=>{const p=pm[r.pid];return p?(p.num!==""?p.num+" ":"")+pName(p):r.name};
@@ -838,14 +840,16 @@ async function fetchStats(kind,force){const fx=S.data.fixture;if(!fx)return;cons
     if(needP){const res=await api("fixtures/players?fixture="+fx),pm=S.data;
       const side=id=>id===pm.teams.home.apiId?"home":id===pm.teams.away.apiId?"away":null,out={home:[],away:[]};
       res.forEach(e=>{const sd=side(e.team&&e.team.id);if(!sd)return;
-        (e.players||[]).forEach(x=>{const s=(x.statistics||[])[0]||{},g=s.games||{};if(!g.minutes)return;
+        (e.players||[]).forEach(x=>{const s=(x.statistics||[])[0]||{},g=s.games||{},pe=s.penalty||{};if(!g.minutes)return;
           const app=pm.teams[sd].players.find(p=>p.apiId===x.player.id);
           const n=v=>v==null?null:v;
           out[sd].push({pid:app?app.id:null,name:x.player.name,min:g.minutes,rt:g.rating!=null?(+g.rating).toFixed(1):null,
             g:n(s.goals&&s.goals.total),a:n(s.goals&&s.goals.assists),sh:n(s.shots&&s.shots.total),sot:n(s.shots&&s.shots.on),
             pas:n(s.passes&&s.passes.total),acc:s.passes&&s.passes.accuracy!=null?s.passes.accuracy:null,kp:n(s.passes&&s.passes.key),
             tk:n(s.tackles&&s.tackles.total),int:n(s.tackles&&s.tackles.interceptions),dw:n(s.duels&&s.duels.won),
-            drb:n(s.dribbles&&s.dribbles.success),fd:n(s.fouls&&s.fouls.drawn),fc:n(s.fouls&&s.fouls.committed),sv:n(s.goals&&s.goals.saves)})})});
+            drb:n(s.dribbles&&s.dribbles.success),fd:n(s.fouls&&s.fouls.drawn),fc:n(s.fouls&&s.fouls.committed),sv:n(s.goals&&s.goals.saves),
+            dt:n(s.duels&&s.duels.total),da:n(s.dribbles&&s.dribbles.attempts),off:n(s.offsides),pw:n(pe.won),pc:n(pe.commited??pe.committed),pm:n(pe.missed),
+            ps:n(pe.saved),gc:g.position==="G"?n(s.goals&&s.goals.conceded):null})})});
       st.players=out.home.length||out.away.length?out:null;if(!st.players)STATS_MSG="選手スタッツはまだありませんでした";
     }
     keepStats();
@@ -1368,12 +1372,17 @@ function renderPinfo(){const pm=pmap(),p=pm[PC_PID];if(!p){closePinfo();return}
   let solo=false;
   if(src&&src.st&&src.st.length){const rows=src.st;
     const sum=rows.reduce((a,r)=>a.map((v,i)=>v+(+r[i+3]||0)),[0,0,0,0,0,0,0,0]);
-    const tr=(name,v,cls)=>`<tr${cls?` class="${cls}"`:""}><td>${name}</td><td>${v[0]}</td><td>${v[1]}</td><td>${v[2]}</td><td>${v[3]}</td><td>${v[4]}</td><td>${v[5]}</td><td>${v[6]+v[7]}</td></tr>`;
+    /* extras (average rating, sub in/out, bench, shots, on target, key passes) exist only in snapshots fetched after this feature */
+    const ex=r=>r.length>12?r.slice(12,19):null,all=rows.every(ex);
+    let exSum=null;if(all){const w=rows.filter(r=>r[12]!=null&&+r[5]>0),m=w.reduce((a,r)=>a+(+r[5]),0);
+      exSum=[m?Math.round(w.reduce((a,r)=>a+r[12]*r[5],0)/m*100)/100:null,...[13,14,15,16,17,18].map(i=>rows.reduce((a,r)=>a+(+r[i]||0),0))]}
+    const d=v=>v==null?"–":v,rt=v=>v==null?"–":(+v).toFixed(2);
+    const tr=(name,v,x,cls)=>`<tr${cls?` class="${cls}"`:""}><td>${name}</td><td>${v[0]}</td><td>${v[1]}</td><td>${d(x&&x[1])}</td><td>${d(x&&x[2])}</td><td>${d(x&&x[3])}</td><td>${v[2]}</td><td>${v[3]}</td><td>${v[4]}</td><td>${d(x&&x[4])}</td><td>${d(x&&x[5])}</td><td>${d(x&&x[6])}</td><td>${v[5]}</td><td>${v[6]+v[7]}</td><td>${rt(x&&x[0])}</td></tr>`;
     const lname=r=>lgLogo(r[0])+esc(lgName(r[0],r[1])+(r[2]&&r[2]!==T.apiId&&r[11]?`(${tName(r[2],r[11])})`:""));
     h+=`<p class="pcnote" style="margin:0 0 4px">${past?sl+" シーズンの成績":"今シーズンの成績"}</p>
-      <div class="pcwrap"><table class="pcst"><thead><tr><th>大会</th><th>出場</th><th>先発</th><th>分</th><th>得点</th><th>アシスト</th><th>警告</th><th>退場</th></tr></thead><tbody>
-      ${rows.map(r=>tr(lname(r),r.slice(3))).join("")}${rows.length>1?tr("公式戦合計",sum,"tot"):""}</tbody></table></div>
-      <p class="pcnote">${fmtAt(info.pre.at)} 取得${past?"":"(この試合のキックオフ前)"}。退場は2枚目の警告を含みます。${src.solo?"他クラブ在籍分を含みます。":""}</p>`;
+      <div class="pcwrap"><table class="pcst"><thead><tr><th>大会</th><th>出場</th><th>先発</th><th>途中出場</th><th>途中交代</th><th>ベンチ</th><th>分</th><th>得点</th><th>アシスト</th><th>シュート</th><th>枠内</th><th>キーパス</th><th>警告</th><th>退場</th><th>平均評価</th></tr></thead><tbody>
+      ${rows.map(r=>tr(lname(r),r.slice(3),ex(r))).join("")}${rows.length>1?tr("公式戦合計",sum,exSum,"tot"):""}</tbody></table></div>
+      <p class="pcnote">${fmtAt(info.pre.at)} 取得${past?"":"(この試合のキックオフ前)"}。退場は2枚目の警告を含みます。合計の平均評価は出場時間で重みづけ。${src.solo?"他クラブ在籍分を含みます。":""}${all?"":"途中出場・シュート・平均評価などは、この機能より前の取得分には無く「–」です(取り直すと出ます)。"}</p>`;
   }else if(info.pre){solo=true;
     h+=`<p class="empty">${sl} シーズンの${esc(tName(T.apiId,T.name))}にこの選手の記録はありません(移籍・昇格などで加入した選手)。</p>`}
   else h+=`<p class="empty">まだ成績を取得していません。${info.later?"(キックオフ後に取得した今シーズンの成績はネタバレになるため使いません)":""}</p>`;
@@ -1383,8 +1392,10 @@ function renderPinfo(){const pm=pmap(),p=pm[PC_PID];if(!p){closePinfo();return}
     <span class="pcnote" style="margin:0">API 2〜3回。${fs&&fs<info.season?"終わったシーズンの成績なので、すぐ表示できます。":info.ko&&Date.now()>=info.ko?"この試合は始まっているため、今シーズンの成績は次の試合から表示します(年齢・国籍などはすぐ表示)。":"キックオフ前なので、この試合で表示できます。"}</span>
     ${PC_MSG?`<span class="fmsg${PC_ERR?" err":""}">${esc(PC_MSG)}</span>`:""}</div>`;
   $("pcBox").innerHTML=h}
-const piRow=s=>{const g=s.games||{},go=s.goals||{},c=s.cards||{};
-  return [s.league.id,s.league.name||"",s.team&&s.team.id||null,g.appearences??g.appearances??0,g.lineups||0,g.minutes||0,go.total||0,go.assists||0,c.yellow||0,c.yellowred||0,c.red||0,s.team&&s.team.name||""]};
+const piRow=s=>{const g=s.games||{},go=s.goals||{},c=s.cards||{},sb=s.substitutes||{},sh=s.shots||{},pa=s.passes||{};
+  const rt=g.rating!=null&&+g.rating>0?Math.round(+g.rating*100)/100:null;
+  return [s.league.id,s.league.name||"",s.team&&s.team.id||null,g.appearences??g.appearances??0,g.lineups||0,g.minutes||0,go.total||0,go.assists||0,c.yellow||0,c.yellowred||0,c.red||0,s.team&&s.team.name||"",
+    rt,sb.in||0,sb.out||0,sb.bench||0,sh.total||0,sh.on||0,pa.key||0]};
 const piPlayer=x=>{const pl=x.player||{},ss=(x.statistics||[]).filter(s=>s.league&&!/friendl/i.test(s.league.name||"")),ps=(x.statistics||[]).find(s=>s.games&&s.games.position);
   return {b:pl.birth&&pl.birth.date||null,n:pl.nationality||null,h:pl.height||null,w:pl.weight||null,pos:ps?ps.games.position:null,st:ss.map(piRow)}};
 /* call the players endpoint; when the plan refuses the season, remember its last allowed season and retry once there */
