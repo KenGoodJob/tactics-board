@@ -417,7 +417,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261104162823">20261104162823</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261104164430">20261104164430</span></p>
 </div>
 
 <script>
@@ -1043,6 +1043,14 @@ function teamJa(id,en){const e=id!=null&&NAMES.teams&&NAMES.teams[id];if(!e||!e[
   const a=fold(e[1]),b=fold(en);return a===b||(a.length>=3&&b.includes(a))||(b.length>=3&&a.includes(b))?e[0]:null}
 const plJa=p=>p&&p.apiId!=null&&NAMES.players&&NAMES.players[p.apiId]||null;
 const tName=(id,en)=>JA&&teamJa(id,en)||en;
+/* other sections of names.json: leagues / venues {id:[ja, English words to match, (venues) city ja]}, coaches {id:[ja, en]}, referees {"English name as the API sends it":[ja]} */
+const nmMatch=(e,en)=>{if(!e||!e[0])return false;if(!e[1]||!en)return true;const a=fold(e[1]),b=fold(en);return a===b||(a.length>=3&&b.includes(a))||(b.length>=3&&a.includes(b))};
+const lgJa=(id,en)=>{const e=id!=null&&NAMES.leagues&&NAMES.leagues[id];return nmMatch(e,en)?e[0]:null};
+const lgName=(id,en)=>JA&&lgJa(id,en)||LG_NAME[id]||en||"";
+function venueJa(id,en){const V=NAMES.venues||{};let e=id!=null&&V[id];if(e&&nmMatch(e,en))return e;
+  if(en){const f=fold(en);e=Object.values(V).find(x=>x&&x[1]&&fold(x[1])===f);if(e)return e}return null}
+const coachJa=c=>{const e=c&&c.id!=null&&NAMES.coaches&&NAMES.coaches[c.id];return e&&e[0]||null};
+function refJa(en){const R=NAMES.referees||{};if(!en)return null;if(R[en])return R[en][0];const f=fold(en),k=Object.keys(R).find(x=>fold(x)===f);return k?R[k][0]:null}
 /* the API sends some characters as HTML entities (O&apos;Brien) */
 const unent=s=>String(s??"").replace(/&(apos|#39|quot|lt|gt|amp);/g,(m,k)=>({apos:"'","#39":"'",quot:'"',lt:"<",gt:">",amp:"&"}[k]));
 const pName=p=>{const e=JA&&plJa(p);return e&&e[0]||unent(p.name)};
@@ -1051,7 +1059,7 @@ const pShort=p=>{const e=JA&&plJa(p);return e&&e[0]?(e[2]||e[0].split("・").pop
 async function loadNames(){try{const r=await fetch("names.json",{cache:"no-cache"});if(!r.ok)return "fail";const j=await r.json();
   if(!j||typeof j.teams!=="object"||typeof j.players!=="object")return "fail";if(JSON.stringify(j)===JSON.stringify(NAMES))return "same";
   NAMES=j;ls.set("tacboard.names",j);refreshNames();return "new"}catch(e){return "fail"}}
-function refreshNames(){render();renderRecent();renderTeams();if(lastFx)renderFixtures(lastFx);renderNameBox()}
+function refreshNames(){render();renderRecent();renderTeams();if(lastFx)renderFixtures(lastFx);renderNameBox();if(!$("pcard").hidden)renderPinfo();if(!$("mcard").hidden)renderMinfo()}
 /* names still missing: teams seen in searches, and teams / players of saved matches and the open match */
 function noteTeams(list){const ask=ls.get("tacboard.nameAsk",{});let ch=false;
   list.forEach(([t,lg])=>{if(t&&t.id!=null&&!teamJa(t.id,t.name)&&!ask[t.id]){ask[t.id]=[t.name,lg||""];ch=true}});
@@ -1065,16 +1073,31 @@ function missingNames(){
   if(S&&S.data)datas.push([S.data,""]);
   datas.forEach(([d,lg])=>["home","away"].forEach(s=>{const T=d.teams&&d.teams[s];if(!T||T.apiId==null)return;addT(T.apiId,T.name,lg);
     (T.players||[]).forEach(p=>{if(p.apiId==null||plJa(p)||players.has(p.apiId))return;players.set(p.apiId,{id:p.apiId,name:p.name,num:p.num,team:T.name,teamId:T.apiId})})}));
-  return {teams:[...teams.values()],players:[...players.values()]};
+  const leagues=new Map(),coaches=new Map(),venues=new Map(),refs=new Map();
+  const addL=(id,name)=>{if(id==null||!name||lgJa(id,name)||leagues.has(+id))return;leagues.set(+id,{id:+id,name})};
+  datas.forEach(([d])=>{const i=d.info;if(i){if(i.lgId!=null&&!LG_NAME[i.lgId])addL(i.lgId,i.league);
+      if(i.venue&&!venueJa(i.venueId,i.venue)){const k=i.venueId??i.venue;if(!venues.has(k))venues.set(k,{id:i.venueId??"",name:i.venue,city:i.city||""})}
+      if(i.referee){const [n,c]=i.referee.split(",").map(x=>x.trim());if(n&&!refJa(n)&&!refs.has(n))refs.set(n,{name:n,country:c||""})}}
+    ["home","away"].forEach(sd=>{const T=d.teams&&d.teams[sd],c=T&&T.coach;if(c&&c.id!=null&&!coachJa(c)&&!coaches.has(c.id))coaches.set(c.id,{id:c.id,name:c.name,team:T.name,teamId:T.apiId})})});
+  /* competitions and other clubs that appear in the saved player stats */
+  Object.keys(ls.get("tacboard.pinfoIdx",{})).forEach(tid=>piSnaps(tid).forEach(sn=>Object.values(sn.p||{}).forEach(x=>(x.st||[]).forEach(r=>{
+    if(!LG_NAME[r[0]])addL(r[0],r[1]);if(r[2]!=null&&r[11])addT(r[2],r[11],"選手成績")}))));
+  return {teams:[...teams.values()],players:[...players.values()],leagues:[...leagues.values()],coaches:[...coaches.values()],venues:[...venues.values()],referees:[...refs.values()]};
 }
-function missingText(){const m=missingNames();if(!m.teams.length&&!m.players.length)return "";
+const missCount=m=>m.teams.length+m.players.length+m.leagues.length+m.coaches.length+m.venues.length+m.referees.length;
+function missingText(){const m=missingNames();if(!missCount(m))return "";
   return [`観戦戦術ボード 日本語名の追加依頼 ${todayJST()}`,
     `[teams] ID / 英語名 / 大会`,...m.teams.map(t=>[t.id,t.name,t.lg].join("\t")),
-    `[players] ID / 英語名 / 背番号 / チーム`,...m.players.map(p=>[p.id,p.name,p.num,`${p.team}(${p.teamId})`].join("\t"))].join("\n")}
+    `[players] ID / 英語名 / 背番号 / チーム`,...m.players.map(p=>[p.id,p.name,p.num,`${p.team}(${p.teamId})`].join("\t")),
+    ...(m.leagues.length?[`[leagues] ID / 英語名`,...m.leagues.map(x=>[x.id,x.name].join("\t"))]:[]),
+    ...(m.coaches.length?[`[coaches] ID / 英語名 / チーム`,...m.coaches.map(x=>[x.id,x.name,`${x.team}(${x.teamId})`].join("\t"))]:[]),
+    ...(m.venues.length?[`[venues] ID / 英語名 / 都市`,...m.venues.map(x=>[x.id,x.name,x.city].join("\t"))]:[]),
+    ...(m.referees.length?[`[referees] 英語名 / 国`,...m.referees.map(x=>[x.name,x.country].join("\t"))]:[])].join("\n")}
 function renderNameBox(){const m=missingNames(),nt=Object.keys(NAMES.teams||{}).length,np=Object.keys(NAMES.players||{}).length;
   $("nmJa").checked=JA;
-  $("nmInfo").textContent=`対応表: チーム ${nt} / 選手 ${np}${NAMES.updated?`(${NAMES.updated} 更新)`:""} ・ 未登録: チーム ${m.teams.length} / 選手 ${m.players.length}`;
-  $("nmCopy").disabled=$("nmShare").disabled=!(m.teams.length||m.players.length)}
+  const other=m.leagues.length+m.coaches.length+m.venues.length+m.referees.length;
+  $("nmInfo").textContent=`対応表: チーム ${nt} / 選手 ${np}${NAMES.updated?`(${NAMES.updated} 更新)`:""} ・ 未登録: チーム ${m.teams.length} / 選手 ${m.players.length}${other?` / 大会・監督・会場・審判 ${other}`:""}`;
+  $("nmCopy").disabled=$("nmShare").disabled=!missCount(m)}
 const todayJST=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
 function shiftDate(d,n){const x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
 let quota=null;
@@ -1120,9 +1143,9 @@ let lastFx=null;
 function renderFixtures(list){
   const sel=ls.get("tacboard.leagues",LEAGUES.map(l=>l[0])),all=ls.get("tacboard.allLeagues",false);
   const rows=list.filter(f=>all||sel.includes(f.league.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
-  noteTeams(rows.flatMap(f=>{const lg=LG_NAME[f.league.id]||f.league.name;return [[f.teams.home,lg],[f.teams.away,lg]]}));
+  noteTeams(rows.flatMap(f=>{const lg=lgName(f.league.id,f.league.name);return [[f.teams.home,lg],[f.teams.away,lg]]}));
   $("fList").innerHTML=rows.length?rows.map(f=>`<li><span class="ko">${esc(f.fixture.date.slice(11,16))}</span>
-      <span class="vs"><span class="lg">${esc(LG_NAME[f.league.id]||f.league.name)}</span>${star(f.teams.home)}${logo(f.teams.home.id)}${esc(tName(f.teams.home.id,f.teams.home.name))} vs ${star(f.teams.away)}${logo(f.teams.away.id)}${esc(tName(f.teams.away.id,f.teams.away.name))}</span>
+      <span class="vs"><span class="lg">${esc(lgName(f.league.id,f.league.name))}</span>${star(f.teams.home)}${logo(f.teams.home.id)}${esc(tName(f.teams.home.id,f.teams.home.name))} vs ${star(f.teams.away)}${logo(f.teams.away.id)}${esc(tName(f.teams.away.id,f.teams.away.name))}</span>
       <button class="ghost" data-fx="${f.fixture.id}">読み込む</button></li>`).join("")
     :`<li style="display:block" class="empty">該当する試合はありません。リーグの選択や日付を変えてみてください。</li>`;
 }
@@ -1250,7 +1273,7 @@ function renderPinfo(){const pm=pmap(),p=pm[PC_PID];if(!p){closePinfo();return}
   if(src&&src.st&&src.st.length){const rows=src.st;
     const sum=rows.reduce((a,r)=>a.map((v,i)=>v+(+r[i+3]||0)),[0,0,0,0,0,0,0,0]);
     const tr=(name,v,cls)=>`<tr${cls?` class="${cls}"`:""}><td>${esc(name)}</td><td>${v[0]}</td><td>${v[1]}</td><td>${v[2]}</td><td>${v[3]}</td><td>${v[4]}</td><td>${v[5]}</td><td>${v[6]+v[7]}</td></tr>`;
-    const lname=r=>(LG_NAME[r[0]]||r[1])+(r[2]&&r[2]!==T.apiId&&r[11]?`(${tName(r[2],r[11])})`:"");
+    const lname=r=>lgName(r[0],r[1])+(r[2]&&r[2]!==T.apiId&&r[11]?`(${tName(r[2],r[11])})`:"");
     h+=`<p class="pcnote" style="margin:0 0 4px">${past?sl+" シーズンの成績":"今シーズンの成績"}</p>
       <div class="pcwrap"><table class="pcst"><thead><tr><th>大会</th><th>出場</th><th>先発</th><th>分</th><th>得点</th><th>アシスト</th><th>警告</th><th>退場</th></tr></thead><tbody>
       ${rows.map(r=>tr(lname(r),r.slice(3))).join("")}${rows.length>1?tr("公式戦合計",sum,"tot"):""}</tbody></table></div>
@@ -1315,7 +1338,7 @@ document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!$("pcard"
 /* ---------- match info: venue, kickoff, round, referee, coaches, weather at kickoff ----------
    Everything here is known before kickoff (no score / status is kept). Weather comes from Open-Meteo (free, no key, not API-Football). */
 function fxInfo(fx){const fi=fx.fixture||{},v=fi.venue||{},lg=fx.league||{};
-  return {venue:v.name||null,city:v.city||null,referee:fi.referee||null,round:lg.round||null,league:lg.name||null,lgId:lg.id||null,country:lg.country||null}}
+  return {venue:v.name||null,venueId:v.id??null,city:v.city||null,referee:fi.referee||null,round:lg.round||null,league:lg.name||null,lgId:lg.id||null,country:lg.country||null}}
 const roundJa=r=>{if(!r)return "";let m=/Regular Season - (\d+)/i.exec(r);if(m)return "第"+m[1]+"節";m=/League Stage - (\d+)/i.exec(r);if(m)return "リーグフェーズ 第"+m[1]+"節";
   const J={"Final":"決勝","Semi-finals":"準決勝","Quarter-finals":"準々決勝","Round of 16":"ラウンド16","Round of 32":"ラウンド32","Knockout Round Play-offs":"プレーオフ"};return J[r]||r};
 const WX={0:"快晴",1:"晴れ",2:"晴れ時々曇り",3:"曇り",45:"霧",48:"霧",51:"霧雨",53:"霧雨",55:"霧雨",56:"着氷性の霧雨",57:"着氷性の霧雨",61:"小雨",63:"雨",65:"強い雨",66:"着氷性の雨",67:"着氷性の雨",
@@ -1328,15 +1351,15 @@ const coachUrl=id=>`https://media.api-sports.io/football/coachs/${encodeURICompo
 function renderMinfo(){const d=S.data,T=d.teams,i=d.info||{},ko=kickoffOf(d);
   let h=`<div class="pchd"><div><h3>試合情報</h3><div class="pct">${logo(T.home.apiId)}${esc(tName(T.home.apiId,T.home.name))} – ${esc(tName(T.away.apiId,T.away.name))}${logo(T.away.apiId)}</div></div><button class="pcx" id="mcClose" aria-label="閉じる">×</button></div>`;
   if(!d.fixture){$("mcBox").innerHTML=h+`<p class="empty">テスト用・手入力の試合には試合情報がありません。</p>`;return}
-  const lg=i.lgId&&LG_NAME[i.lgId]||i.league;
-  const coach=t=>{const c=T[t].coach;if(!c)return "–";const u=coachUrl(c.id);return `<span class="mcrow">${FACE_BAD.has(u)?"":`<img class="face" src="${esc(u)}" alt="">`}${esc(unent(c.name))}</span>`};
+  const lg=lgName(i.lgId,i.league);
+  const coach=t=>{const c=T[t].coach;if(!c)return "–";const u=coachUrl(c.id);return `<span class="mcrow">${FACE_BAD.has(u)?"":`<img class="face" src="${esc(u)}" alt="">`}${esc(JA&&coachJa(c)||unent(c.name))}</span>`};
   const ref=i.referee?i.referee.split(",").map(x=>x.trim()):null;
   const wx=i.wx;
   h+=`<dl class="pcprof">
     ${lg?`<dt>大会</dt><dd>${esc(lg)}${i.round?" "+esc(roundJa(i.round)):""}</dd>`:""}
     ${ko&&d.kickoff?`<dt>キックオフ</dt><dd>${esc(new Date(ko+9*3600e3).toISOString().slice(0,16).replace("T"," ").replace(/-/g,"/"))}(日本時間)</dd>`:""}
-    ${i.venue||i.city?`<dt>会場</dt><dd>${esc([i.venue,i.city].filter(Boolean).join("・"))}</dd>`:""}
-    <dt>主審</dt><dd>${ref?esc(ref[0])+(ref[1]?`(${esc(NAT_JA[ref[1]]||ref[1])})`:""):"–"}</dd>
+    ${i.venue||i.city?(()=>{const v=JA&&venueJa(i.venueId,i.venue);const vn=v?v[0]:i.venue,cn=v&&v[2]||i.city;return `<dt>会場</dt><dd>${esc(vn&&cn?vn+"("+cn+")":vn||cn)}</dd>`})():""}
+    <dt>主審</dt><dd>${ref?esc(JA&&refJa(ref[0])||ref[0])+(ref[1]?`(${esc(NAT_JA[ref[1]]||ref[1])})`:""):"–"}</dd>
     <dt>監督</dt><dd><div style="display:flex;flex-direction:column;gap:4px">${["home","away"].map(t=>`<span class="mcrow">${logo(T[t].apiId)}${coach(t)}</span>`).join("")}</div></dd>
     <dt>天気</dt><dd class="wx">${MC_BUSY==="wx"?"取得しています…":wx?`${esc(WX[wx.code]||"–")}・${wx.t}℃・湿度${wx.rh}%・風${wx.ws}m/s${wx.pr?`・降水${wx.pr}mm`:""}<br><small class="pcnote">キックオフ時刻の${esc(wx.place)}付近(Open-Meteo)${wx.fc?"・予報":""}</small>`:i.city?"–":"会場の情報がありません"}</dd>
   </dl>`;

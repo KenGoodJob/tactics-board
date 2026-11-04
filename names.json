@@ -1,5 +1,5 @@
 {
-"about": "観戦戦術ボードの日本語名の対応表。キーは API-Football のID。teams: [日本語名, 照合用の英語名(APIの名前に含まれる語)]、players: [日本語名, APIの英語名, 盤面用の短い名前(省略可)]",
+"about": "観戦戦術ボードの日本語名の対応表。キーは API-Football のID。teams: [日本語名, 照合用の英語名(APIの名前に含まれる語)]、players: [日本語名, APIの英語名, 盤面用の短い名前(省略可)]、leagues: [日本語名, 照合用の英語名]、coaches: [日本語名, APIの英語名]、venues: [日本語名, 照合用の英語名, 都市の日本語名]、referees: キーはAPIの英語名そのまま、[日本語名]",
 "updated": "2026-11-04",
 "teams": {
   "33": ["マンチェスター・ユナイテッド", "Manchester United"],
@@ -184,5 +184,39 @@
   "129711": ["ブレナン・ジョンソン", "B. Johnson"],
   "18860": ["マーク・トラヴァース", "M. Travers"],
   "413034": ["グレアム", "B. Graham"]
+},
+"leagues": {
+  "40": ["チャンピオンシップ", "Championship"],
+  "41": ["EFLリーグ1", "League One"],
+  "45": ["FAカップ", "FA Cup"],
+  "48": ["カラバオカップ", "League Cup"],
+  "528": ["コミュニティ・シールド", "Community Shield"],
+  "141": ["ラ・リーガ2部", "Segunda"],
+  "143": ["コパ・デル・レイ", "Copa del Rey"],
+  "556": ["スーペルコパ", "Super Cup"],
+  "136": ["セリエB", "Serie B"],
+  "137": ["コッパ・イタリア", "Coppa Italia"],
+  "547": ["スーペルコッパ", "Super Cup"],
+  "79": ["ブンデスリーガ2部", "2. Bundesliga"],
+  "81": ["DFBポカール", "DFB Pokal"],
+  "529": ["DFLスーパーカップ", "Super Cup"],
+  "62": ["リーグ・ドゥ", "Ligue 2"],
+  "66": ["クープ・ドゥ・フランス", "Coupe de France"],
+  "526": ["トロフェ・デ・シャンピオン", "Trophée des Champions"],
+  "531": ["UEFAスーパーカップ", "UEFA Super Cup"],
+  "15": ["クラブワールドカップ", "Club World Cup"],
+  "94": ["プリメイラ・リーガ", "Primeira Liga"],
+  "88": ["エールディヴィジ", "Eredivisie"],
+  "144": ["ベルギー・プロリーグ", "Pro League"],
+  "179": ["スコティッシュ・プレミアシップ", "Premiership"],
+  "203": ["スュペル・リグ", "Super Lig"],
+  "253": ["MLS", "Major League Soccer"],
+  "98": ["J1リーグ", "J1 League"]
+},
+"coaches": {
+},
+"venues": {
+},
+"referees": {
 }
 }
