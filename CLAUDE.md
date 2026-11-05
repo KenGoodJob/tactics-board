@@ -78,7 +78,7 @@
 
 ### データの保持
 - 配置・時間・試合データは **sessionStorage のみ**(再読み込みでは残る、閉じたら消える)
-- localStorage に残すのは、APIキー・リーグの絞り込み・読み込み済み試合のキャッシュ(リクエスト節約のため)と、試合ごとの「保存した配置」、日本語名の対応表のキャッシュ(`tacboard.names`)・日本語表示の切り替え(`tacboard.ja`)・未登録チームのメモ(`tacboard.nameAsk`、最大300件)・盤面マークと顔写真の表示切り替え(`tacboard.marks`・`tacboard.faces`)、選手情報(`tacboard.pinfo.*`・`tacboard.pinfoIdx`・`tacboard.pinfoMax`)、読み込み方(`tacboard.loadMode`)だけ
+- localStorage に残すのは、APIキー・リーグの絞り込み・読み込み済み試合のキャッシュ(リクエスト節約のため)と、試合ごとの「保存した配置」、日本語名の対応表のキャッシュ(`tacboard.names`)・日本語表示の切り替え(`tacboard.ja`)・未登録チームのメモ(`tacboard.nameAsk`、最大300件)・盤面マークと顔写真の表示切り替え(`tacboard.marks`・`tacboard.faces`)、選手情報(`tacboard.pinfo.*`・`tacboard.pinfoIdx`・`tacboard.pinfoMax`)、読み込み方(`tacboard.loadMode`)、最後の検索結果(`tacboard.lastFx`)、日本代表だけの表示(`tacboard.japan`)だけ
   - 「保存した配置」= `tacboard.shape.<試合キー>` に、チーム×パターンごとのシステム(fm)・保存位置(pos)と「左右を反転」の状態を保存。試合キーは API の試合なら `fx<fixture id>`、それ以外はホーム名|アウェイ名
   - 保存していないドラッグ位置・時間・反映済みの出来事は残さない(開き直してもネタバレしないため)
   - 端末ごとの保存なので、iPad と iPhone では共有されない
@@ -97,6 +97,7 @@
 - 使用回数: 応答ヘッダー `x-ratelimit-requests-limit/remaining` と `status` エンドポイントの `requests.current/limit_day` から「本日のAPI使用: N / 100 回」を表示(`tacboard.usage` に UTC の日付つきで保存)
 - APIキーは画面で入力し、その端末の localStorage にだけ保存する。**リポジトリには絶対に入れない**
 - 検索: `fixtures?date=YYYY-MM-DD&timezone=Asia/Tokyo` を1回。一覧にはキックオフ時刻・リーグ・対戦カードだけを出す(スコアや status は表示もキャッシュもしない)
+- 最後の検索結果(2026-11-06 にユーザーの依頼で追加): 検索のたびに `tacboard.lastFx={date,at,list}`(slimFx で削った一覧、スコア・status なし)に上書き保存し、起動時に復元して表示する(「MM/DD HH:MM 時点の一覧。最新にするには「検索」」)。日付が選べる範囲内なら日付欄もその日にする。終了済みかどうか(done)は検索時点の値なので、まとめて取得では `fixtures?id=` の応答の status で上書きする(個別取得では検索時点のまま。終わる前の一覧から読み込むと保存されない)
 - 読み込み方は「APIキーの設定」内のラジオボタンで選ぶ(`tacboard.loadMode`、2026-11-05 にユーザーと決定)
   - **まとめて取得(初期値、"one")**: `fixtures?id=` 1回でスタメン・出来事(応答のスコア等は使わない)、スタメン発表後なら続けて `injuries?fixture=` 1回。終了済みの試合は応答の statistics・players から試合全体のチームスタッツと選手スタッツも `data.stats` に入れる(表示は従来どおりスタッツを広げたときだけ)。前半の数字が応答に無ければ `stats.noH1=true` とし、前半終了の行を広げたときだけ `fixtures/statistics?half=true` を1回取る。応答に lineups・events が無いときは自動で個別取得に切り替える
   - **個別に取得("split")**: `fixtures/lineups`(スタメン未発表ならここまで)、`fixtures/events` と `injuries?fixture=` を並行で

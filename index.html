@@ -450,7 +450,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106002735">20261106002735</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106003122">20261106003122</span></p>
 </div>
 
 <script>
@@ -1365,6 +1365,7 @@ async function search(){
     if(!list){list=await api(`fixtures?date=${date}&timezone=Asia/Tokyo`);
       if(date<shiftDate(todayJST(),-1))ls.set("tacboard.fx."+date,list.map(slimFx))}
     lastFx=list;renderFixtures(list);fmsg("fMsg",`${date} の試合 ${quotaText()}`);
+    ls.set("tacboard.lastFx",{date,at:Date.now(),list:list.map(f=>f.done!=null?f:slimFx(f))});
   }catch(e){fmsg("fMsg",e.message,true)}
 }
 /* keep only what the board needs; scores and status are dropped before caching */
@@ -1372,6 +1373,10 @@ const slimFx=f=>({fixture:{id:f.fixture.id,date:f.fixture.date,timestamp:f.fixtu
   league:{id:f.league.id,name:f.league.name,season:f.league.season,round:f.league.round,country:f.league.country},teams:{home:{id:f.teams.home.id,name:f.teams.home.name},away:{id:f.teams.away.id,name:f.teams.away.name}},
   done:["FT","AET","PEN"].includes(f.fixture.status&&f.fixture.status.short)});
 $("fSearch").onclick=search;
+/* the last search is kept (slimmed: no score or status) so the list is there again after the app restarts */
+function restoreFx(){const s=ls.get("tacboard.lastFx",null);if(!s||!Array.isArray(s.list))return;
+  lastFx=s.list;const d=$("fDate");if(s.date>=d.min&&s.date<=d.max){d.value=s.date;dateRange()}
+  renderFixtures(lastFx);fmsg("fMsg",`${s.date} の試合(${fmtAt(s.at)} 時点の一覧。最新にするには「検索」)`)}
 /* the free plan only serves yesterday, today and tomorrow */
 function dateRange(){const t=todayJST(),lo=shiftDate(t,-1),hi=shiftDate(t,1),d=$("fDate");d.min=lo;d.max=hi;
   if(!d.value||d.value<lo||d.value>hi)d.value=t;$("fPrev").disabled=d.value<=lo;$("fNext").disabled=d.value>=hi}
@@ -1710,6 +1715,7 @@ document.querySelectorAll('input[name="loadMode"]').forEach(r=>{r.checked=r.valu
   r.onchange=()=>{try{localStorage.setItem("tacboard.loadMode",r.value)}catch(e){}}});
 async function fetchMatchOne(f){
   const fid=f.fixture.id,res=await api("fixtures?id="+fid),x=res&&res[0];
+  if(x&&x.fixture&&x.fixture.status)f.done=["FT","AET","PEN"].includes(x.fixture.status.short);
   if(!x||!Array.isArray(x.lineups)||!Array.isArray(x.events))return undefined;   /* the reply lacks them: fall back to the older way */
   if(!x.lineups.length)return null;
   const inj=await api("injuries?fixture="+fid).catch(()=>null);
@@ -1898,7 +1904,7 @@ $("finder").addEventListener("toggle",()=>{if($("finder").open)renderNameBox()})
 $("nmReload").onclick=async()=>{$("nmReload").disabled=true;fmsg("nmMsg","読み直しています…");const r=await loadNames();$("nmReload").disabled=false;
   renderNameBox();fmsg("nmMsg",r==="new"?"新しい対応表を反映しました":r==="same"?"対応表は最新です(変更はありません)":"読み直せませんでした。通信状態を確認してください",r==="fail")};
 
-$("fDate").value=todayJST();dateRange();renderUsage();renderLeagues();renderRecent();renderKey();renderTeams();promptCheck();renderNameBox();loadNames();checkUpdate();
+$("fDate").value=todayJST();dateRange();renderUsage();renderLeagues();restoreFx();renderRecent();renderKey();renderTeams();promptCheck();renderNameBox();loadNames();checkUpdate();
 
 buildChips();renderEditor();render();
 })();
