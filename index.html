@@ -394,6 +394,11 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
             <button class="ghost" id="fUsage">使用回数を確認</button>
           </div>
           <div class="fmsg" id="fKeyMsg"></div>
+          <p class="hint" style="margin-top:10px">試合の読み込み方:</p>
+          <div class="frow" id="loadModeBox">
+            <label><input type="radio" name="loadMode" value="one"> まとめて取得(試合1回+欠場者1回。終わった試合はスタッツも)</label>
+            <label><input type="radio" name="loadMode" value="split"> 個別に取得(スタメン・出来事・欠場者で3回)</label>
+          </div>
         </div>
       </details>
     </div>
@@ -440,7 +445,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105145528">20261105145528</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105145714">20261105145714</span></p>
 </div>
 
 <script>
@@ -827,37 +832,43 @@ function statsPanel(kind){const st=S.data.stats||{};let h="";
   return h}
 /* save fetched stats with the match (and into the device's saved copy when it is a saved, finished match) */
 function keepStats(){save();const id=entryId(S.data);if(id&&localStorage.getItem("tacboard.match."+id))ls.set("tacboard.match."+id,S.data)}
+/* team stats: the reply of fixtures/statistics, or the statistics part of fixtures?id= (first half only when the reply has it) */
+function parseTeamStats(res,teams){const side=id=>id===teams.home.apiId?"home":id===teams.away.apiId?"away":null;
+  const obj=arr=>{const o={};(arr||[]).forEach(x=>{if(x&&x.type)o[x.type]=x.value});return o};
+  const full={},h1={};let has1=false,keys=new Set();
+  (res||[]).forEach(e=>{const sd=side(e.team&&e.team.id);if(!sd)return;Object.keys(e).forEach(k=>keys.add(k));
+    full[sd]=obj(e.statistics);const f=e.statistics_1h||e.statistics_first_half||e.statistics_1st_half||(e.halves&&e.halves.first);
+    if(Array.isArray(f)&&f.length){h1[sd]=obj(f);has1=true}});
+  return {full:full.home&&full.away?full:null,h1:has1&&h1.home&&h1.away?h1:null,keys:has1?"":[...keys].join(", ")}}
+/* player stats: the reply of fixtures/players, or the players part of fixtures?id= */
+function parsePlayerStats(res,pm){
+  const side=id=>id===pm.teams.home.apiId?"home":id===pm.teams.away.apiId?"away":null,out={home:[],away:[]},ci={has:0,on:0};
+  (res||[]).forEach(e=>{const sd=side(e.team&&e.team.id);if(!sd)return;
+    (e.players||[]).forEach(x=>{const s=(x.statistics||[])[0]||{},g=s.games||{},pe=s.penalty||{};
+      /* how the response marks captains (checked on real matches: whether the field exists and how many are true) */
+      if("captain" in g)ci.has++;if(g.captain===true||g.captain==="true"||g.captain===1)ci.on++;if(!g.minutes)return;
+      const app=pm.teams[sd].players.find(p=>p.apiId===x.player.id);
+      const n=v=>v==null?null:v;
+      out[sd].push({pid:app?app.id:null,name:x.player.name,min:g.minutes,rt:g.rating!=null?(+g.rating).toFixed(1):null,
+        g:n(s.goals&&s.goals.total),a:n(s.goals&&s.goals.assists),sh:n(s.shots&&s.shots.total),sot:n(s.shots&&s.shots.on),
+        pas:n(s.passes&&s.passes.total),acc:s.passes&&s.passes.accuracy!=null?s.passes.accuracy:null,kp:n(s.passes&&s.passes.key),
+        tk:n(s.tackles&&s.tackles.total),int:n(s.tackles&&s.tackles.interceptions),dw:n(s.duels&&s.duels.won),
+        drb:n(s.dribbles&&s.dribbles.success),fd:n(s.fouls&&s.fouls.drawn),fc:n(s.fouls&&s.fouls.committed),sv:n(s.goals&&s.goals.saves),
+        dt:n(s.duels&&s.duels.total),da:n(s.dribbles&&s.dribbles.attempts),off:n(s.offsides),pw:n(pe.won),pc:n(pe.commited??pe.committed),pm:n(pe.missed),
+        ps:n(pe.saved),gc:g.position==="G"?n(s.goals&&s.goals.conceded):null,...(g.captain===true||g.captain==="true"||g.captain===1?{cap:true}:{})})})});
+  return {players:out.home.length||out.away.length?out:null,capInfo:ci}}
 async function fetchStats(kind,force){const fx=S.data.fixture;if(!fx)return;const st=S.data.stats=S.data.stats||{};
-  const needT=force||!st.full,needP=kind==="ft"&&(force||!st.players);if(!needT&&!needP)return;
+  /* noH1: the stats came with fixtures?id= and had no first half, so the 前半終了 row still asks fixtures/statistics?half=true once */
+  const needT=force||!st.full||(kind==="ht"&&st.noH1&&!st.h1),needP=kind==="ft"&&(force||!st.players);if(!needT&&!needP)return;
   STATS_BUSY=kind;STATS_MSG="";render();
   try{
     if(needT){let res,half=true;
       try{res=await api("fixtures/statistics?fixture="+fx+"&half=true")}catch(e){half=false;res=await api("fixtures/statistics?fixture="+fx)}
-      const side=id=>id===S.data.teams.home.apiId?"home":id===S.data.teams.away.apiId?"away":null;
-      const obj=arr=>{const o={};(arr||[]).forEach(x=>{if(x&&x.type)o[x.type]=x.value});return o};
-      const full={},h1={};let has1=false,keys=new Set();
-      res.forEach(e=>{const sd=side(e.team&&e.team.id);if(!sd)return;Object.keys(e).forEach(k=>keys.add(k));
-        full[sd]=obj(e.statistics);const f=e.statistics_1h||e.statistics_first_half||e.statistics_1st_half||(e.halves&&e.halves.first);
-        if(Array.isArray(f)&&f.length){h1[sd]=obj(f);has1=true}});
-      st.full=full.home&&full.away?full:null;st.h1=has1&&h1.home&&h1.away?h1:null;st.keys=has1?"":[...keys].join(", ")+(half?"":" / half指定は使えませんでした");
+      const r=parseTeamStats(res,S.data.teams);st.full=r.full;st.h1=r.h1;st.keys=r.keys+(half||r.h1?"":" / half指定は使えませんでした");delete st.noH1;
       if(!st.full)STATS_MSG="スタッツはまだありませんでした";
     }
-    if(needP){const res=await api("fixtures/players?fixture="+fx),pm=S.data;
-      const side=id=>id===pm.teams.home.apiId?"home":id===pm.teams.away.apiId?"away":null,out={home:[],away:[]},ci={has:0,on:0};
-      res.forEach(e=>{const sd=side(e.team&&e.team.id);if(!sd)return;
-        (e.players||[]).forEach(x=>{const s=(x.statistics||[])[0]||{},g=s.games||{},pe=s.penalty||{};
-          /* how the response marks captains (checked on real matches: whether the field exists and how many are true) */
-          if("captain" in g)ci.has++;if(g.captain===true||g.captain==="true"||g.captain===1)ci.on++;if(!g.minutes)return;
-          const app=pm.teams[sd].players.find(p=>p.apiId===x.player.id);
-          const n=v=>v==null?null:v;
-          out[sd].push({pid:app?app.id:null,name:x.player.name,min:g.minutes,rt:g.rating!=null?(+g.rating).toFixed(1):null,
-            g:n(s.goals&&s.goals.total),a:n(s.goals&&s.goals.assists),sh:n(s.shots&&s.shots.total),sot:n(s.shots&&s.shots.on),
-            pas:n(s.passes&&s.passes.total),acc:s.passes&&s.passes.accuracy!=null?s.passes.accuracy:null,kp:n(s.passes&&s.passes.key),
-            tk:n(s.tackles&&s.tackles.total),int:n(s.tackles&&s.tackles.interceptions),dw:n(s.duels&&s.duels.won),
-            drb:n(s.dribbles&&s.dribbles.success),fd:n(s.fouls&&s.fouls.drawn),fc:n(s.fouls&&s.fouls.committed),sv:n(s.goals&&s.goals.saves),
-            dt:n(s.duels&&s.duels.total),da:n(s.dribbles&&s.dribbles.attempts),off:n(s.offsides),pw:n(pe.won),pc:n(pe.commited??pe.committed),pm:n(pe.missed),
-            ps:n(pe.saved),gc:g.position==="G"?n(s.goals&&s.goals.conceded):null,...(g.captain===true||g.captain==="true"||g.captain===1?{cap:true}:{})})})});st.capInfo=ci;
-      st.players=out.home.length||out.away.length?out:null;if(!st.players)STATS_MSG="選手スタッツはまだありませんでした";
+    if(needP){const r=parsePlayerStats(await api("fixtures/players?fixture="+fx),S.data);st.players=r.players;st.capInfo=r.capInfo;
+      if(!st.players)STATS_MSG="選手スタッツはまだありませんでした";
     }
     keepStats();
   }catch(e){STATS_MSG=e.message||"取得できませんでした"}
@@ -1652,7 +1663,27 @@ function storeMatch(f,data){
     home:{id:f.teams.home.id,name:f.teams.home.name},away:{id:f.teams.away.id,name:f.teams.away.name}});
 }
 const isDone=f=>f.done!=null?f.done:["FT","AET","PEN"].includes(f.fixture.status&&f.fixture.status.short);
+/* how a match is loaded (setting, tacboard.loadMode): "one" (default) = fixtures?id= gives lineups, events and, for a finished
+   match, the full-match team and player stats in one reply (its score is never used), then injuries; "split" = the older way */
+const loadMode=()=>{try{return localStorage.getItem("tacboard.loadMode")==="split"?"split":"one"}catch(e){return "one"}};
 async function fetchMatch(f){
+  if(loadMode()==="one"){const r=await fetchMatchOne(f);if(r!==undefined)return r}
+  return fetchMatchSplit(f)}
+document.querySelectorAll('input[name="loadMode"]').forEach(r=>{r.checked=r.value===loadMode();
+  r.onchange=()=>{try{localStorage.setItem("tacboard.loadMode",r.value)}catch(e){}}});
+async function fetchMatchOne(f){
+  const fid=f.fixture.id,res=await api("fixtures?id="+fid),x=res&&res[0];
+  if(!x||!Array.isArray(x.lineups)||!Array.isArray(x.events))return undefined;   /* the reply lacks them: fall back to the older way */
+  if(!x.lineups.length)return null;
+  const inj=await api("injuries?fixture="+fid).catch(()=>null);
+  const data=convert(f,x.lineups,x.events);if(!data)return data;
+  if(inj)data.inj={at:Date.now(),list:parseInj(inj,data.teams)};
+  /* stats only for a finished match (a running one would keep half-filled numbers); shown only when the stats row is opened */
+  if(isDone(f)){const t=parseTeamStats(x.statistics,data.teams),pl=parsePlayerStats(x.players,data);
+    if(t.full||pl.players){const st={};if(t.full){st.full=t.full;st.h1=t.h1;st.keys=t.keys;if(!t.h1)st.noH1=true}
+      if(pl.players){st.players=pl.players;st.capInfo=pl.capInfo}data.stats=st}}
+  return data}
+async function fetchMatchSplit(f){
   const fid=f.fixture.id;
   /* lineups first: before they are announced nothing else is requested. Then events and injuries together;
      a failed injuries request does not stop the match from loading (the button can fetch it later) */
