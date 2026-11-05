@@ -307,7 +307,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <div class="status" id="status"></div>
   </section>
 
-  <div class="boardbox" id="secBoard"><div class="tacbar"><button class="tacbtn rec" id="tacRec" hidden aria-pressed="false">● 記録</button><button class="tacbtn" id="tacPlay" hidden aria-pressed="false">▶ 再生</button><button class="tacbtn" id="tacDel" hidden>1本消す</button><button class="tacbtn" id="tacUndo" hidden>1つ戻す</button><button class="tacbtn" id="tacBtn" aria-pressed="false">戦術モード</button></div><div class="taccount" id="tacCount" hidden></div><svg id="board" viewBox="-4 -6 113 94" aria-label="戦術ボード"></svg></div>
+  <div class="boardbox" id="secBoard"><div class="tacbar"><button class="tacbtn rec" id="tacRec" hidden aria-pressed="false">● 記録</button><button class="tacbtn" id="tacRate" hidden>速さ 等速</button><button class="tacbtn" id="tacPlay" hidden aria-pressed="false">▶ 再生</button><button class="tacbtn" id="tacDel" hidden>1本消す</button><button class="tacbtn" id="tacUndo" hidden>1つ戻す</button><button class="tacbtn" id="tacBtn" aria-pressed="false">戦術モード</button></div><div class="taccount" id="tacCount" hidden></div><svg id="board" viewBox="-4 -6 113 94" aria-label="戦術ボード"></svg></div>
 
   <div class="possbar" id="secPoss">
     <span class="plabel">配置パターン</span>
@@ -445,7 +445,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105145714">20261105145714</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105175103">20261105175103</span></p>
 </div>
 
 <script>
@@ -990,7 +990,7 @@ function svgPt(ev){const pt=svg.createSVGPoint();pt.x=ev.clientX;pt.y=ev.clientY
 /* ---------- 戦術モード: a movable ball and thick freehand lines. Screen coordinates, kept only in memory; turning it off clears everything ---------- */
 const TAC={on:false,ball:null,lines:[]},TAC_COLOR="#ffd21f",TAC_W=1.1;let tdraw=null;
 /* 1つ戻す: lines, ball moves and player / bench drags, newest first. Cleared when positions are reset wholesale (更新, time tap, pattern / system / team buttons, loading a match) */
-const UNDO=[],TAKES=[],RP={st:null,t0:0,cur:null,seg:null,segs:null,base:null,els:{},raf:0,timer:0,end:0};
+const UNDO=[],TAKES=[],RP={st:null,t0:0,cur:null,seg:null,segs:null,base:null,els:{},raf:0,timer:0,end:0,rate:1,rt:1,shown:""};
 function undoPush(a){UNDO.push(a);if(UNDO.length>100)UNDO.shift()}
 function undoClear(){UNDO.length=0;recClear()}
 function undoOne(){const a=UNDO.pop();if(!a)return;
@@ -1015,7 +1015,9 @@ $("tacUndo").addEventListener("click",undoOne);
 /* 再生モード: record one object at a time (the takes recorded so far play while recording), then play every take together.
    Kept in memory in screen coordinates like the lines; recording drags are not saved as positions.
    A take = list of segments {key, pts:[{t,x,y}]} (t = ms from the take's start). key: "ball" / "s:<team>:<slot>" / "b:<bench id>" */
-const REC_MAX=90000;
+/* 15 s of scene time per take. スロー: while recording, the clock (and the takes already recorded) runs at RP.rate; times are stored in scene time, so 再生 plays at normal speed */
+const REC_MAX=15000,RATES=[1,.75,.5,.25],rateName=r=>r===1?"等速":r+"倍";
+const sceneT=now=>(now-RP.t0)*RP.rt;
 function objKey(g){return g.classList.contains("tball")?"ball":g.dataset.bench?"b:"+g.dataset.bench:"s:"+g.dataset.team+":"+g.dataset.slot}
 function objEl(k){let e=RP.els[k];if(e&&e.isConnected)return e;
   e=k==="ball"?svg.querySelector(".tball"):k.startsWith("b:")?[...svg.querySelectorAll(".pl[data-bench]")].find(x=>x.dataset.bench===k.slice(2)):svg.querySelector(`.pl[data-team="${k.split(":")[1]}"][data-slot="${k.split(":")[2]}"]`);
@@ -1031,22 +1033,23 @@ function posAt(list,t,base){let a=null;for(const sg of list)if(t>=sg.s&&t<=sg.e&
     const p=P[lo],q=P[hi],f=q.t>p.t?Math.min(1,Math.max(0,(t-p.t)/(q.t-p.t))):1;return {x:p.x+(q.x-p.x)*f,y:p.y+(q.y-p.y)*f}}
   let l=null;for(const sg of list)if(sg.e<t&&(!l||sg.e>l.e||(sg.e===l.e&&sg.i>l.i)))l=sg;
   return l?l.pts[l.pts.length-1]:base}
-function recFrame(now){if(!RP.st||RP.st==="count")return;const t=now-RP.t0,segs=RP.segs,hold=RP.seg&&RP.seg.key;
+function recFrame(now){if(!RP.st||RP.st==="count")return;const t=sceneT(now),segs=RP.segs,hold=RP.seg&&RP.seg.key;
   for(const k in segs){if(k===hold)continue;const e=objEl(k);if(!e)continue;
     if(!(k in RP.base))RP.base[k]=objPos(e);const p=posAt(segs[k],t,RP.base[k]);if(p)objSet(e,p.x,p.y)}
   if(RP.st==="play"&&t>RP.end+150){recStop();return}
-  if(RP.st==="rec"&&t>REC_MAX){recStop();return}
+  if(RP.st==="rec"){if(t>=REC_MAX){recStop();return}
+    const left=Math.ceil((REC_MAX-t)/1000)+"";if(left!==RP.shown){RP.shown=left;$("tacRec").textContent=`■ 止める 残り${left}秒`}}
   RP.raf=requestAnimationFrame(recFrame)}
 /* every object back to its place on the board, and remember those places as the start of the scene */
 function recReset(){if(drag){drag.g.classList.remove("dragging");drag=null}render();RP.els={};RP.base={};
   const segs=recSegs();for(const k in segs){const e=objEl(k);if(e)RP.base[k]=objPos(e)}RP.segs=segs}
 function recStart(){if(RP.st)return;recReset();RP.cur={segs:[]};RP.st="count";let n=3;const c=$("tacCount");c.hidden=false;c.textContent=n;recUi();
   const tick=()=>{if(RP.st!=="count")return;n--;if(n>0){c.textContent=n;RP.timer=setTimeout(tick,700);return}
-    c.hidden=true;RP.st="rec";RP.t0=performance.now();recUi();RP.raf=requestAnimationFrame(recFrame)};
+    c.hidden=true;RP.st="rec";RP.rt=RP.rate;RP.shown="";RP.t0=performance.now();recUi();RP.raf=requestAnimationFrame(recFrame)};
   RP.timer=setTimeout(tick,700)}
 function recPlay(){if(RP.st||!TAKES.length)return;recReset();
   RP.end=0;for(const k in RP.segs)RP.segs[k].forEach(sg=>{if(sg.e>RP.end)RP.end=sg.e});
-  RP.st="play";RP.t0=performance.now();recUi();RP.raf=requestAnimationFrame(recFrame)}
+  RP.st="play";RP.rt=1;RP.t0=performance.now();recUi();RP.raf=requestAnimationFrame(recFrame)}
 /* stop recording / playing. Objects stay where they ended until the next render */
 function recStop(){clearTimeout(RP.timer);cancelAnimationFrame(RP.raf);$("tacCount").hidden=true;
   if(RP.st==="rec"||RP.st==="count"){if(drag&&drag.rec){drag.g.classList.remove("dragging");recRelease();drag=null}
@@ -1054,21 +1057,28 @@ function recStop(){clearTimeout(RP.timer);cancelAnimationFrame(RP.raf);$("tacCou
   RP.st=null;RP.cur=null;RP.seg=null;tacUi()}
 function recClear(){const was=RP.st||TAKES.length;if(RP.st){RP.cur=null;recStop()}TAKES.length=0;if(was)recUi()}
 /* while recording: a grab starts a segment at the object's current place (it may be moving in an earlier take) */
-function recGrab(g){const k=objKey(g),p=objPos(g),t=performance.now()-RP.t0;drag.moved=true;
+function recGrab(g){const k=objKey(g),p=objPos(g),t=Math.min(REC_MAX,sceneT(performance.now()));drag.moved=true;
   RP.seg={key:k,pts:[{t,x:p.x,y:p.y}]};drag.rec=RP.seg;RP.els[k]=g;if(!(k in RP.base))RP.base[k]=p}
 /* a finger that rests sends no moves; keep the resting place up to just before the next move so playback does not glide */
-function recPt(sg,x,y){const t=performance.now()-RP.t0,P=sg.pts,l=P[P.length-1];
-  if(t-l.t>50)P.push({t:t-16,x:l.x,y:l.y});P.push({t,x,y})}
-function recRelease(){const sg=RP.seg;if(!sg)return;const t=performance.now()-RP.t0,l=sg.pts[sg.pts.length-1];
-  if(t>l.t)sg.pts.push({t,x:l.x,y:l.y});RP.cur.segs.push(sg);RP.seg=null;RP.segs=recSegs()}
-function recUi(){const on=TAC.on,r=$("tacRec"),p=$("tacPlay"),d=$("tacDel");
-  r.hidden=p.hidden=d.hidden=!on;
+function recPt(sg,x,y){const t=Math.min(REC_MAX,sceneT(performance.now())),P=sg.pts,l=P[P.length-1];if(t<=l.t)return;
+  if(t-l.t>50*RP.rt)P.push({t:t-16*RP.rt,x:l.x,y:l.y});P.push({t,x,y})}
+/* スロー only: played back faster, the small shakes of a finger get faster too; average each point over about 80 ms of real time (ends kept) */
+function smoothPts(P,rt){if(rt>=1||P.length<5)return P;const w=40*rt;
+  return P.map((p,i)=>{if(i===0||i===P.length-1)return p;let sx=0,sy=0,n=0;
+    for(let j=i;j>=0&&p.t-P[j].t<=w;j--){sx+=P[j].x;sy+=P[j].y;n++}
+    for(let j=i+1;j<P.length&&P[j].t-p.t<=w;j++){sx+=P[j].x;sy+=P[j].y;n++}
+    return {t:p.t,x:sx/n,y:sy/n}})}
+function recRelease(){const sg=RP.seg;if(!sg)return;const t=Math.min(REC_MAX,sceneT(performance.now())),l=sg.pts[sg.pts.length-1];
+  if(t>l.t)sg.pts.push({t,x:l.x,y:l.y});sg.pts=smoothPts(sg.pts,RP.rt);RP.cur.segs.push(sg);RP.seg=null;RP.segs=recSegs()}
+function recUi(){const on=TAC.on,r=$("tacRec"),p=$("tacPlay"),d=$("tacDel"),v=$("tacRate");
+  r.hidden=p.hidden=d.hidden=v.hidden=!on;v.textContent="速さ "+rateName(RP.rate);v.setAttribute("aria-pressed",RP.rate<1);v.disabled=!!RP.st;
   const rec=RP.st==="rec"||RP.st==="count",play=RP.st==="play";
-  r.textContent=rec?"■ 記録を止める":"● 記録"+(TAKES.length?` ${TAKES.length+1}本目`:"");r.setAttribute("aria-pressed",rec);r.disabled=play;
+  r.textContent=rec?(RP.st==="count"?"■ 止める":`■ 止める 残り${RP.shown||15}秒`):"● 記録"+(TAKES.length?` ${TAKES.length+1}本目`:"");r.setAttribute("aria-pressed",rec);r.disabled=play;
   p.textContent=play?"■ 止める":"▶ 再生"+(TAKES.length?`(${TAKES.length}本)`:"");p.setAttribute("aria-pressed",play);p.disabled=rec||!TAKES.length;
   d.disabled=!!RP.st||!TAKES.length}
 $("tacRec").addEventListener("click",()=>{if(RP.st==="rec"||RP.st==="count")recStop();else recStart()});
 $("tacPlay").addEventListener("click",()=>{if(RP.st==="play")recStop();else recPlay()});
+$("tacRate").addEventListener("click",()=>{if(RP.st)return;RP.rate=RATES[(RATES.indexOf(RP.rate)+1)%RATES.length];recUi()});
 $("tacDel").addEventListener("click",()=>{if(RP.st||!TAKES.length)return;TAKES.pop();render()});
 svg.addEventListener("pointerdown",ev=>{
   if(drag||tdraw)return;
