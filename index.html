@@ -257,6 +257,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
 .evtable td:first-child{font-family:var(--f-display);font-weight:600;font-variant-numeric:tabular-nums;width:4em}
 .tblwrap{overflow-x:auto}
 .del{border:1px solid var(--line);background:transparent;border-radius:6px;padding:2px 10px;font-size:12px;color:var(--danger)}
+.del.armed{background:var(--danger);color:#fff;border-color:var(--danger)}
 .jsonbox{display:flex;flex-direction:column;gap:8px}
 .jsonbox textarea{min-height:120px}
 .btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -445,7 +446,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105213639">20261105213639</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105214658">20261105214658</span></p>
 </div>
 
 <script>
@@ -1603,7 +1604,7 @@ const REASON_JA={"Injury":"負傷","Knock":"打撲","Illness":"体調不良","Su
   "Achilles Tendon Injury":"アキレス腱の負傷","Broken ankle":"足首の骨折","Broken Leg":"脚の骨折","Broken foot":"足の骨折","Concussion":"脳しんとう","Cruciate Ligament Injury":"十字靭帯の負傷",
   "Ligament Injury":"靭帯の負傷","Muscle Strain":"肉離れ","Lack of fitness":"コンディション不良","Personal Reasons":"個人的な理由","Coach's decision":"監督の判断","Inactive":"不出場",
   "International duty":"代表招集","Rest":"休養","Virus":"ウイルス感染","Surgery":"手術","Wrist Injury":"手首の負傷","Arm Injury":"腕の負傷","Face Injury":"顔の負傷","Abdominal Injury":"腹部の負傷",
-  "Rib Injury":"肋骨の負傷","Toe Injury":"つま先の負傷","Heel Injury":"かかとの負傷","Neck Injury":"首の負傷","Adductor Injury":"内転筋の負傷","Pelvis Injury":"骨盤の負傷","Not in squad":"メンバー外"};
+  "Rib Injury":"肋骨の負傷","Toe Injury":"つま先の負傷","Heel Injury":"かかとの負傷","Neck Injury":"首の負傷","Adductor Injury":"内転筋の負傷","Pelvis Injury":"骨盤の負傷","Not in squad":"メンバー外","Off the roster":"登録メンバー外"};
 let INJ_BUSY=false,INJ_MSG="",INJ_SHOW="";
 const injKey=d=>d&&d.fixture?String(d.fixture)+(d.copy?"~"+d.copy:""):"";
 function parseInj(res,teams){const side=id=>id===teams.home.apiId?"home":id===teams.away.apiId?"away":null,list=[],seen=new Set();
@@ -1732,6 +1733,9 @@ $("fRecent").addEventListener("click",e=>{
   const st=e.target.closest("[data-star]");if(st){toggleTeam(+st.dataset.star,st.dataset.name);return}
   const o=e.target.closest("[data-open]"),d=e.target.closest("[data-forget]");
   if(o){const c=ls.get("tacboard.match."+o.dataset.open,null);if(c){loadMatch(c);fmsg("fMsg","保存済みのデータを開きました(通信なし)");closeFinder()}}
+  /* forgetting needs a second tap on the same button within 3 seconds */
+  if(d&&!d.classList.contains("armed")){d.classList.add("armed");d.textContent="もう一度タップで消す";
+    clearTimeout(d._t);d._t=setTimeout(()=>{d.classList.remove("armed");d.textContent="消す"},3000);return}
   if(d){const c=ls.get("tacboard.match."+d.dataset.forget,null);if(c)ls.del(matchKey(c));ls.del("tacboard.match."+d.dataset.forget);ls.set("tacboard.recent",ls.get("tacboard.recent",[]).filter(r=>String(r.id)!==d.dataset.forget));renderRecent()}
 });
 
