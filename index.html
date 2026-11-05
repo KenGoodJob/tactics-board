@@ -123,6 +123,7 @@ details.editor>summary span.safe{color:var(--muted)}
 .frow{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
 .frow .field input{min-width:0}
 .lgs{display:flex;gap:6px;flex-wrap:wrap}
+.lgs .lgh{flex-basis:100%;font-size:12px;color:var(--muted);margin-top:4px}
 .lgs label{display:flex;align-items:center;gap:4px;font-size:13px;border:1px solid var(--line);border-radius:999px;padding:3px 10px;background:var(--bg)}
 .fmsg{font-size:13px;color:var(--muted);min-height:1.2em}
 .fmsg.err{color:var(--danger)}
@@ -446,7 +447,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105220419">20261105220419</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106001857">20261106001857</span></p>
 </div>
 
 <script>
@@ -1214,7 +1215,13 @@ function rememberLast(data){const id=data&&entryId(data);try{if(id&&localStorage
 
 /* ---------- API-Football (key stays in this browser only) ---------- */
 const API="https://v3.football.api-sports.io/";
-const LEAGUES=[[39,"プレミアリーグ"],[140,"ラ・リーガ"],[135,"セリエA"],[78,"ブンデスリーガ"],[61,"リーグ・アン"],[2,"CL"],[3,"EL"],[848,"ECL"]];
+/* league filter groups; the date search returns every league in one request, so extra groups cost no API calls */
+const LG_GROUPS=[["リーグ戦・欧州カップ",[[39,"プレミアリーグ"],[140,"ラ・リーガ"],[135,"セリエA"],[78,"ブンデスリーガ"],[61,"リーグ・アン"],[2,"CL"],[3,"EL"],[848,"ECL"]]],
+  ["国内カップ",[[45,"FAカップ"],[48,"カラバオカップ"],[143,"コパ・デル・レイ"],[81,"DFBポカール"]]],
+  ["クラブW杯",[[15,"クラブワールドカップ"]]],
+  ["代表",[[1,"ワールドカップ"],[4,"EURO"],[5,"ネーションズリーグ"],[10,"国際親善試合"]]]];
+const LEAGUES=LG_GROUPS.flatMap(g=>g[1]);
+const LG_DEF=LG_GROUPS[0][1].map(l=>l[0]);
 const LG_NAME=Object.fromEntries(LEAGUES);
 const ls={get(k,d){try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}},
   set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
@@ -1317,9 +1324,9 @@ async function checkUsage(){fmsg("fKeyMsg","確認しています…");
 
 /* league filter */
 function renderLeagues(){
-  const sel=ls.get("tacboard.leagues",LEAGUES.map(l=>l[0])),all=ls.get("tacboard.allLeagues",false);
-  $("fLeagues").innerHTML=LEAGUES.map(([id,n])=>`<label><input type="checkbox" data-lg="${id}" ${sel.includes(id)?"checked":""}>${n}</label>`).join("")
-    +`<label><input type="checkbox" id="fAll" ${all?"checked":""}>その他のリーグも表示</label>`;
+  const sel=ls.get("tacboard.leagues",LG_DEF),all=ls.get("tacboard.allLeagues",false);
+  $("fLeagues").innerHTML=LG_GROUPS.map(([g,ls_])=>`<div class="lgh">${g}</div>`+ls_.map(([id,n])=>`<label><input type="checkbox" data-lg="${id}" ${sel.includes(id)?"checked":""}>${n}</label>`).join("")).join("")
+    +`<div class="lgh">その他</div><label><input type="checkbox" id="fAll" ${all?"checked":""}>その他のリーグも表示</label>`;
 }
 $("fLeagues").addEventListener("change",()=>{
   ls.set("tacboard.leagues",[...document.querySelectorAll("[data-lg]:checked")].map(x=>+x.dataset.lg));
@@ -1330,7 +1337,7 @@ $("fLeagues").addEventListener("change",()=>{
 const star=t=>{const on=myTeams().some(x=>x.id===t.id);return `<button class="star${on?" on":""}" data-star="${t.id}" data-name="${esc(t.name)}" aria-pressed="${on}" aria-label="${esc(t.name)}を${on?"登録から外す":"登録する"}">${on?"★":"☆"}</button>`};
 let lastFx=null;
 function renderFixtures(list){
-  const sel=ls.get("tacboard.leagues",LEAGUES.map(l=>l[0])),all=ls.get("tacboard.allLeagues",false);
+  const sel=ls.get("tacboard.leagues",LG_DEF),all=ls.get("tacboard.allLeagues",false);
   const rows=list.filter(f=>all||sel.includes(f.league.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
   noteTeams(rows.flatMap(f=>{const lg=lgName(f.league.id,f.league.name);return [[f.teams.home,lg],[f.teams.away,lg]]}));
   $("fList").innerHTML=rows.length?rows.map(f=>`<li><span class="ko">${esc(f.fixture.date.slice(11,16))}</span>
