@@ -440,7 +440,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105145452">20261105145452</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105145528">20261105145528</span></p>
 </div>
 
 <script>
@@ -1571,8 +1571,10 @@ async function fetchWeather(){const d=S.data,i=d.info,ko=kickoffOf(d);if(!i||!i.
 $("infoBtn").onclick=openMinfo;
 $("mcard").addEventListener("click",e=>{if(e.target.id==="mcard"||e.target.closest("#mcClose")){closeMinfo();return}
   if(e.target.closest("#mcFetch")&&!MC_BUSY)fetchFxInfo()});
-/* ---------- injuries / suspensions for this fixture (injuries?fixture=, 1 request, only on the button) ----------
-   It lists who will not (or may not) play, decided before kickoff, so it shows nothing about the match itself */
+/* ---------- injuries / suspensions for this fixture (injuries?fixture=, 1 request) ----------
+   Fetched together with the match (fetchMatch) and by the button. It lists who will not (or may not) play, but it is
+   not confirmed that injuries during the match are never added afterwards, so the list stays hidden until 「表示する」
+   (per match, not saved: hidden again after a reload) */
 const INJ_JA={"Missing Fixture":"欠場","Questionable":"出場微妙"};
 const REASON_JA={"Injury":"負傷","Knock":"打撲","Illness":"体調不良","Suspended":"出場停止","Yellow Cards":"累積警告で出場停止","Red Card":"退場による出場停止",
   "Knee Injury":"膝の負傷","Hamstring Injury":"ハムストリングの負傷","Muscle Injury":"筋肉系の負傷","Ankle Injury":"足首の負傷","Calf Injury":"ふくらはぎの負傷","Thigh Injury":"太ももの負傷",
@@ -1581,10 +1583,18 @@ const REASON_JA={"Injury":"負傷","Knock":"打撲","Illness":"体調不良","Su
   "Ligament Injury":"靭帯の負傷","Muscle Strain":"肉離れ","Lack of fitness":"コンディション不良","Personal Reasons":"個人的な理由","Coach's decision":"監督の判断","Inactive":"不出場",
   "International duty":"代表招集","Rest":"休養","Virus":"ウイルス感染","Surgery":"手術","Wrist Injury":"手首の負傷","Arm Injury":"腕の負傷","Face Injury":"顔の負傷","Abdominal Injury":"腹部の負傷",
   "Rib Injury":"肋骨の負傷","Toe Injury":"つま先の負傷","Heel Injury":"かかとの負傷","Neck Injury":"首の負傷","Adductor Injury":"内転筋の負傷","Pelvis Injury":"骨盤の負傷","Not in squad":"メンバー外"};
-let INJ_BUSY=false,INJ_MSG="";
+let INJ_BUSY=false,INJ_MSG="",INJ_SHOW="";
+const injKey=d=>d&&d.fixture?String(d.fixture)+(d.copy?"~"+d.copy:""):"";
+function parseInj(res,teams){const side=id=>id===teams.home.apiId?"home":id===teams.away.apiId?"away":null,list=[],seen=new Set();
+  (res||[]).forEach(r=>{const pl=r.player||{},t=side(r.team&&r.team.id);if(!t||pl.id==null||seen.has(pl.id))return;seen.add(pl.id);
+    list.push({t,id:pl.id,name:pl.name||"?",type:pl.type||"",reason:pl.reason||""})});
+  return list}
 function renderInj(){const d=S.data,T=d.teams,box=$("inj");if(!box)return;
   if(!d.fixture){box.innerHTML=`<p class="empty">テスト用・手入力の試合には欠場者の情報がありません。</p>`;return}
-  let h="";const inj=d.inj;
+  let h="";const inj=d.inj,show=inj&&INJ_SHOW===injKey(d);
+  if(inj&&!show){h+=`<p class="empty">取得済みです。試合中の負傷が加わっている可能性があるため、隠しています。</p>
+      <p class="stfoot"><button class="ghost" id="injShow">表示する</button></p>`;
+    if(INJ_MSG)h+=`<p class="fmsg err">${esc(INJ_MSG)}</p>`;box.innerHTML=h;return}
   if(inj){h+=`<div class="injg">${["home","away"].map(t=>{const l=inj.list.filter(x=>x.t===t);
       return `<div><h3>${logo(T[t].apiId)}${esc(tName(T[t].apiId,T[t].name))}</h3>${l.length?`<ul class="plist">${l.map(x=>{const pl={apiId:x.id,name:x.name};
         return `<li><span><span class="tag ${x.type==="Questionable"?"q":"mf"}">${esc(INJ_JA[x.type]||x.type||"")}</span> ${faceImg(pl)}${esc(pName(pl))}</span><span>${esc(REASON_JA[x.reason]||x.reason||"")}</span></li>`}).join("")}</ul>`:`<p class="empty">情報なし</p>`}</div>`}).join("")}</div>
@@ -1595,14 +1605,13 @@ function renderInj(){const d=S.data,T=d.teams,box=$("inj");if(!box)return;
   box.innerHTML=h}
 async function fetchInj(){const d=S.data;if(!d.fixture||INJ_BUSY)return;INJ_BUSY=true;INJ_MSG="";renderInj();
   try{const res=await api("injuries?fixture="+d.fixture);
-    const side=id=>id===d.teams.home.apiId?"home":id===d.teams.away.apiId?"away":null,list=[],seen=new Set();
-    res.forEach(r=>{const pl=r.player||{},t=side(r.team&&r.team.id);if(!t||pl.id==null||seen.has(pl.id))return;seen.add(pl.id);
-      list.push({t,id:pl.id,name:pl.name||"?",type:pl.type||"",reason:pl.reason||""})});
-    d.inj={at:Date.now(),list};keepStats();
+    const list=parseInj(res,d.teams);
+    d.inj={at:Date.now(),list};INJ_SHOW=injKey(d);keepStats();
     if(!list.length)INJ_MSG="この試合の欠場者の情報はありませんでした";
   }catch(e){INJ_MSG=e.message||"取得できませんでした"}
   INJ_BUSY=false;renderInj()}
-$("inj").addEventListener("click",e=>{if(e.target.closest("#injFetch"))fetchInj()});
+$("inj").addEventListener("click",e=>{if(e.target.closest("#injFetch"))fetchInj();
+  if(e.target.closest("#injShow")){INJ_SHOW=injKey(S.data);renderInj()}});
 
 /* ---------- new version notice ----------
    A home-screen web app is resumed rather than reloaded and keeps its own HTTP cache (GitHub Pages allows 10 min),
@@ -1645,8 +1654,13 @@ function storeMatch(f,data){
 const isDone=f=>f.done!=null?f.done:["FT","AET","PEN"].includes(f.fixture.status&&f.fixture.status.short);
 async function fetchMatch(f){
   const fid=f.fixture.id;
-  const [lineups,events]=await Promise.all([api("fixtures/lineups?fixture="+fid),api("fixtures/events?fixture="+fid)]);
-  return lineups.length?convert(f,lineups,events):null;
+  /* lineups first: before they are announced nothing else is requested. Then events and injuries together;
+     a failed injuries request does not stop the match from loading (the button can fetch it later) */
+  const lineups=await api("fixtures/lineups?fixture="+fid);if(!lineups.length)return null;
+  const [events,inj]=await Promise.all([api("fixtures/events?fixture="+fid),api("injuries?fixture="+fid).catch(()=>null)]);
+  const data=convert(f,lineups,events);
+  if(data&&inj)data.inj={at:Date.now(),list:parseInj(inj,data.teams)};
+  return data;
 }
 async function loadFixture(fid){
   const cached=ls.get("tacboard.match."+fid,null);
