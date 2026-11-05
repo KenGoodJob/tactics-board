@@ -153,8 +153,8 @@ h3.sub{margin:4px 0 0;font-size:13px;color:var(--muted);font-weight:500}
 .tl .tm{text-align:center;font-family:var(--f-display);font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted);background:var(--bg)}
 .tl .tm.hd{background:transparent}
 .tl .c{display:flex;flex-direction:column;gap:3px}
-.tl .mk{grid-column:1/-1;display:flex;align-items:center;justify-content:center;gap:12px;background:var(--bg);font-weight:700}
-.mk .mkl{font-size:13px;color:var(--muted)}.mk .mks{font-family:var(--f-display);font-size:17px;font-variant-numeric:tabular-nums}.mk small{font-size:12px;color:var(--muted)}
+.tl .mk{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;background:var(--bg);font-weight:700}
+.mk .mkl{font-size:13px;color:var(--muted)}.mk .mkc{font-size:11px;line-height:1.3}.mk .mkc.ok{color:var(--muted)}.mk .mkc.ng{color:var(--danger);flex-basis:100%;text-align:center}.mk .mks{font-family:var(--f-display);font-size:17px;font-variant-numeric:tabular-nums}.mk small{font-size:12px;color:var(--muted)}
 .mkb{font:inherit;font-size:13px;font-weight:600;padding:3px 10px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--accent);cursor:pointer}
 .tl .mkp{grid-column:1/-1;border-top:0;padding:4px 4px 12px}
 .mkp h4{margin:14px 0 6px;font-size:14px}
@@ -446,7 +446,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261105214658">20261105214658</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261105215503">20261105215503</span></p>
 </div>
 
 <script>
@@ -789,13 +789,19 @@ function scoreTo(maxSeg){const sc={home:0,away:0},lim=segI(maxSeg);
 function markers(st){const a=norm(S.applied),i=segI(a.seg),out=[],ft=a.seg==="FT";
   const hasAfter=k=>S.data.events.some(e=>segI(evTime(e).seg)>=segI(k));
   const add=(at,label,sc,kind,pk)=>out.push({mk:true,k:segI(at)*100000-1,label,sc,kind,pk});
-  if(i>=segI("2H"))add("2H","前半終了",scoreTo("1H"),"ht");
-  if(i>=segI("ET1")&&(!ft||hasAfter("ET1")))add("ET1","90分終了",scoreTo("2H"));
-  if(i>=segI("PK")&&(!ft||hasAfter("PK")))add("PK","延長終了",scoreTo("ET2"));
-  if(ft){const r=out.push({mk:true,k:segI("FT")*100000,label:"試合終了",sc:st.score,kind:"ft",pk:st.pkUsed?st.pk:null})}
+  const A=S.data.apiScore||null;
+  if(i>=segI("2H"))add("2H","前半終了",scoreTo("1H"),"ht"),out[out.length-1].api=A&&A.ht;
+  if(i>=segI("ET1")&&(!ft||hasAfter("ET1")))add("ET1","90分終了",scoreTo("2H")),out[out.length-1].api=A&&A.ft;
+  if(i>=segI("PK")&&(!ft||hasAfter("PK")))add("PK","延長終了",scoreTo("ET2")),out[out.length-1].api=A&&A.total;
+  if(ft){out.push({mk:true,k:segI("FT")*100000,label:"試合終了",sc:st.score,kind:"ft",pk:st.pkUsed?st.pk:null,api:A&&A.total,apiPk:A&&A.pk})}
   return out}
+/* 答え合わせ: the score counted from the events against the score in the fixtures?id= reply (only on rows already applied) */
+function scoreCheck(r){if(!r.api)return "";
+  const ok=r.api[0]===r.sc.home&&r.api[1]===r.sc.away,pkOk=!r.apiPk||(r.pk?r.apiPk[0]===r.pk.home&&r.apiPk[1]===r.pk.away:false);
+  if(ok&&pkOk)return `<span class="mkc ok" title="APIのスコアと一致">✓ API</span>`;
+  return `<span class="mkc ng">APIのスコアは ${r.api[0]} – ${r.api[1]}${r.apiPk?`(PK ${r.apiPk[0]}–${r.apiPk[1]})`:""}。出来事と違います(VARの取り消しなど)</span>`}
 function markerHtml(r){const canStats=!!(r.kind&&(S.data.fixture||S.data.stats)),open=r.kind&&STATS_OPEN[r.kind];
-  return `<div class="mk"><span class="mkl">${esc(r.label)}</span><span class="mks">${r.sc.home} – ${r.sc.away}${r.pk?` <small>(PK ${r.pk.home}–${r.pk.away})</small>`:""}</span>
+  return `<div class="mk"><span class="mkl">${esc(r.label)}</span><span class="mks">${r.sc.home} – ${r.sc.away}${r.pk?` <small>(PK ${r.pk.home}–${r.pk.away})</small>`:""}</span>${scoreCheck(r)}
     ${canStats?`<button class="mkb" data-stats="${r.kind}" aria-expanded="${open}">スタッツ ${open?"▾":"▸"}</button>`:""}</div>
     ${canStats&&open?`<div class="mkp">${statsPanel(r.kind)}</div>`:""}`}
 const STAT_JA={"Ball Possession":"ボール保持率","expected_goals":"ゴール期待値(xG)","Total Shots":"シュート","Shots on Goal":"枠内シュート","Shots off Goal":"枠外シュート",
@@ -1689,6 +1695,9 @@ async function fetchMatchOne(f){
   const inj=await api("injuries?fixture="+fid).catch(()=>null);
   const data=convert(f,x.lineups,x.events);if(!data)return data;
   if(inj)data.inj={at:Date.now(),list:parseInj(inj,data.teams)};
+  /* the reply's score, kept only to check the score counted from the events (shown on a period row only once that row is applied) */
+  if(isDone(f)){const sc=x.score||{},pr=o=>o&&o.home!=null&&o.away!=null?[+o.home,+o.away]:null;
+    const a={ht:pr(sc.halftime),ft:pr(sc.fulltime),et:pr(sc.extratime),pk:pr(sc.penalty),total:pr(x.goals)};if(a.ht||a.total)data.apiScore=a}
   /* stats only for a finished match (a running one would keep half-filled numbers); shown only when the stats row is opened */
   if(isDone(f)){const t=parseTeamStats(x.statistics,data.teams),pl=parsePlayerStats(x.players,data);
     if(t.full||pl.players){const st={};if(t.full){st.full=t.full;st.h1=t.h1;st.keys=t.keys;if(!t.h1)st.noH1=true}
@@ -1741,7 +1750,7 @@ $("fRecent").addEventListener("click",e=>{
 
 /* ---------- export / import of saved matches as a file (for the Files app / iCloud Drive) ---------- */
 const sameContent=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.inj;delete d.kickoff;delete d.season;delete d.info;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach;KIT.forEach(k=>delete d.teams[t][k]);if(Array.isArray(d.teams[t].players))d.teams[t].players=d.teams[t].players.map(p=>{const q={...p};delete q.pos;return q})}})}if(Array.isArray(d.events))d.events=baseEvents(d.events);const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
+const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.inj;delete d.kickoff;delete d.season;delete d.info;delete d.apiScore;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach;KIT.forEach(k=>delete d.teams[t][k]);if(Array.isArray(d.teams[t].players))d.teams[t].players=d.teams[t].players.map(p=>{const q={...p};delete q.pos;return q})}})}if(Array.isArray(d.events))d.events=baseEvents(d.events);const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
 const pc=o=>{const n=Object.keys(o).length;return n?`と ${n} チームの選手情報`:""};
 /* fill what the saved copy lacks from an imported copy of the same match (injuries, stats, match info, coaches, kickoff, season, positions) */
 /* kit colours and the event details added later (penalty goals, missed penalties, VAR, card reasons) do not make a copy "different" */
@@ -1753,6 +1762,7 @@ function fillExtras(d,src){let ch=false;
   ["kickoff","season"].forEach(k=>{if(!has(d[k])&&has(src[k])){d[k]=src[k];ch=true}});
   if(has(src.info)){if(!has(d.info)){d.info=src.info;ch=true}else Object.keys(src.info).forEach(k=>{if(!has(d.info[k])&&has(src.info[k])){d.info[k]=src.info[k];ch=true}})}
   if(src.inj&&(!d.inj||(src.inj.at||0)>(d.inj.at||0))){d.inj=src.inj;ch=true}
+  if(has(src.apiScore)&&!has(d.apiScore)){d.apiScore=src.apiScore;ch=true}
   if(has(src.stats)){if(!has(d.stats)){d.stats=src.stats;ch=true}else Object.keys(src.stats).forEach(k=>{if(!has(d.stats[k])&&has(src.stats[k])){d.stats[k]=src.stats[k];ch=true}})}
   ["home","away"].forEach(t=>{const a=d.teams&&d.teams[t],b=src.teams&&src.teams[t];if(a&&b&&!a.coach&&b.coach){a.coach=b.coach;ch=true}
     if(a&&b)KIT.forEach(k=>{if(!a[k]&&b[k]){a[k]=b[k];ch=true}});
