@@ -123,6 +123,8 @@ details.editor>summary span.safe{color:var(--muted)}
 .frow{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
 .frow .field input{min-width:0}
 .lgs{display:flex;gap:6px;flex-wrap:wrap}
+.field.kw{display:flex;flex-direction:column;gap:2px;font-size:12px;color:var(--muted);margin:6px 0}
+.field.kw input{font-size:16px;padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg)}
 .lgs .lgh{flex-basis:100%;display:flex;align-items:center;gap:8px;font:inherit;font-size:12px;color:var(--muted);margin-top:6px;padding:2px 0;background:none;border:0;text-align:left;cursor:pointer}
 .lgs .lgh span{font-variant-numeric:tabular-nums}
 .lgs .lgh em{font-style:normal;color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:0 8px;background:var(--bg)}
@@ -352,6 +354,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
         <button class="ghost" id="fNext" aria-label="次の日">翌日</button>
         <button class="update" id="fSearch" style="margin-left:0">検索</button>
       </div>
+      <label class="field kw">キーワードで探す(リーグの選択に関係なく、その日の全試合から)<input type="search" id="fKw" placeholder="例: オランダ、エールディヴィジ、Ajax" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"></label>
       <div class="lgs" id="fLeagues"></div>
       <div class="fmsg" id="fMsg"></div>
       <div class="hint" id="fQuota"></div>
@@ -450,7 +453,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106003122">20261106003122</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106004741">20261106004741</span></p>
 </div>
 
 <script>
@@ -1346,17 +1349,23 @@ $("fLeagues").addEventListener("click",e=>{const b=e.target.closest("[data-lgg]"
 /* fixture search: only kickoff time, league and team names are shown */
 const star=t=>{const on=myTeams().some(x=>x.id===t.id);return `<button class="star${on?" on":""}" data-star="${t.id}" data-name="${esc(t.name)}" aria-pressed="${on}" aria-label="${esc(t.name)}を${on?"登録から外す":"登録する"}">${on?"★":"☆"}</button>`};
 let lastFx=null;
+/* keyword: every word must appear in a team, league or country name (English or Japanese); ignores the league checks */
+function kwHit(f,kw){const l=f.league,h=f.teams.home,a=f.teams.away;
+  const hay=[h.name,a.name,tName(h.id,h.name),tName(a.id,a.name),l.name,lgName(l.id,l.name),l.country,NAT_JA[l.country]||""].join(" "),low=hay.toLowerCase(),fh=fold(hay);
+  return kw.split(/[\s　、,]+/).filter(Boolean).every(w=>low.includes(w.toLowerCase())||(fold(w)&&fh.includes(fold(w))))}
+$("fKw").addEventListener("input",()=>{if(lastFx)renderFixtures(lastFx)});
+$("fKw").addEventListener("keydown",e=>{if(e.key==="Enter")e.target.blur()});
 /* Japan men's A team in any competition (qualifiers, Asian Cup, friendlies…); "Japan W"/"Japan U23" are other teams */
 const isJapan=f=>[f.teams.home,f.teams.away].some(t=>fold(t.name)==="japan");
 function renderFixtures(list){
   const sel=ls.get("tacboard.leagues",LG_DEF),all=ls.get("tacboard.allLeagues",false);
-  const jp=ls.get("tacboard.japan",false);
-  const rows=list.filter(f=>jp?isJapan(f):all||sel.includes(f.league.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
+  const jp=ls.get("tacboard.japan",false),kw=$("fKw").value.trim();
+  const rows=list.filter(f=>kw?kwHit(f,kw):jp?isJapan(f):all||sel.includes(f.league.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
   noteTeams(rows.flatMap(f=>{const lg=lgName(f.league.id,f.league.name);return [[f.teams.home,lg],[f.teams.away,lg]]}));
   $("fList").innerHTML=rows.length?rows.map(f=>`<li><span class="ko">${esc(f.fixture.date.slice(11,16))}</span>
       <span class="vs"><span class="lg">${lgLogo(f.league.id)}${esc(lgName(f.league.id,f.league.name))}</span>${star(f.teams.home)}${logo(f.teams.home.id)}${esc(tName(f.teams.home.id,f.teams.home.name))} vs ${star(f.teams.away)}${logo(f.teams.away.id)}${esc(tName(f.teams.away.id,f.teams.away.name))}</span>
       <button class="ghost" data-fx="${f.fixture.id}">読み込む</button></li>`).join("")
-    :`<li style="display:block" class="empty">${jp?"この日の日本代表の試合はありません。日付を変えてみてください。":"該当する試合はありません。リーグの選択や日付を変えてみてください。"}</li>`;
+    :`<li style="display:block" class="empty">${kw?`「${esc(kw)}」に合う試合はありません。別の書き方(英語名など)や日付を試してください。`:jp?"この日の日本代表の試合はありません。日付を変えてみてください。":"該当する試合はありません。リーグの選択や日付を変えてみてください。"}</li>`;
 }
 async function search(){
   const date=$("fDate").value||todayJST();fmsg("fMsg","検索しています…");$("fList").innerHTML="";
