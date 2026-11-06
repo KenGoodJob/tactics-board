@@ -375,6 +375,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       <div class="tmbox" id="tmBox">
         <h3 class="sub">登録チーム</h3>
         <div class="tmlist" id="tmList"></div>
+        <div id="tmFxBox"><p class="hint" style="margin:4px 0 0">登録チームの試合(保存済みの試合一覧から。前日〜翌日)</p><ul class="fxlist" id="tmFx"></ul></div>
         <div class="frow"><button class="ghost" id="tmCheck">登録チームの試合を今すぐ確認</button></div>
         <p class="hint">前日と当日の試合一覧(2回)と、終わった試合1つにつき2回、APIを使います。終わった試合だけを保存し、結果は表示しません。</p>
         <div class="fmsg" id="tmMsg"></div>
@@ -464,7 +465,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106124003">20261106124003</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106131008">20261106131008</span></p>
 </div>
 
 <script>
@@ -1401,7 +1402,7 @@ function fxDays(){const [lo,hi]=fxRange();let o=ls.get("tacboard.fxDays",null);
   if(!o||!o.days){o={last:null,days:{}};const s=ls.get("tacboard.lastFx",null);   /* the older single-day save */
     if(s&&s.date&&Array.isArray(s.list)){o.days[s.date]={at:s.at,list:s.list};o.last=s.date}ls.del("tacboard.lastFx")}
   Object.keys(o.days).forEach(d=>{if(d<lo||d>hi)delete o.days[d]});if(o.last&&!o.days[o.last])o.last=null;return o}
-function putFxDay(date,at,list){const o=fxDays();o.days[date]={at,list:list.map(slimKeep)};o.last=date;ls.set("tacboard.fxDays",o)}
+function putFxDay(date,at,list,keepLast){const o=fxDays();o.days[date]={at,list:list.map(slimKeep)};if(!keepLast)o.last=date;ls.set("tacboard.fxDays",o);renderTeamFx()}
 function fxDone(fid,done){const o=fxDays();let ch=false;Object.values(o.days).forEach(v=>v.list.forEach(f=>{if(f.fixture.id===fid&&f.done!==done){f.done=done;ch=true}}));if(ch)ls.set("tacboard.fxDays",o)}
 function showFxDay(date){const o=fxDays(),v=o.days[date];if(!v)return false;o.last=date;ls.set("tacboard.fxDays",o);
   lastFx=v.list;renderFixtures(lastFx);fmsg("fMsg",`${date} の試合(${fmtAt(v.at)} 時点の一覧。最新にするには「検索」)`);return true}
@@ -1776,18 +1777,18 @@ async function fetchMatchSplit(f){
   if(data&&inj)data.inj={at:Date.now(),list:parseInj(inj,data.teams)};
   return data;
 }
-async function loadFixture(fid){
+async function loadFixture(fid,mid="fMsg"){
   const cached=ls.get("tacboard.match."+fid,null);
-  if(cached){loadMatch(cached);fmsg("fMsg","保存済みのデータを開きました(通信なし)");closeFinder();return}
-  const f=(lastFx||[]).find(x=>x.fixture.id===fid);if(!f)return;
-  fmsg("fMsg","読み込んでいます…");
+  if(cached){loadMatch(cached);fmsg(mid,"保存済みのデータを開きました(通信なし)");closeFinder();return}
+  const f=(lastFx||[]).find(x=>x.fixture.id===fid)||Object.values(fxDays().days).flatMap(v=>v.list).find(x=>x.fixture.id===fid);if(!f)return;
+  fmsg(mid,"読み込んでいます…");
   try{
     const data=await fetchMatch(f);
-    if(!data){fmsg("fMsg","この試合のスタメンはまだ発表されていません。キックオフの約1時間前から取得できます。"+quotaText(),true);return}
+    if(!data){fmsg(mid,"この試合のスタメンはまだ発表されていません。キックオフの約1時間前から取得できます。"+quotaText(),true);return}
     const done=isDone(f);if(done){storeMatch(f,data);renderRecent()}
     loadMatch(data);
-    fmsg("fMsg",(done?"読み込みました ":"読み込みました。試合が終わる前のデータなので、出来事は途中までです ")+quotaText());closeFinder();
-  }catch(e){fmsg("fMsg",e.message,true)}
+    fmsg(mid,(done?"読み込みました ":"読み込みました。試合が終わる前のデータなので、出来事は途中までです ")+quotaText());closeFinder();
+  }catch(e){fmsg(mid,e.message,true)}
 }
 function closeFinder(){setTimeout(()=>{$("finder").open=false;window.scrollTo({top:0,behavior:"smooth"})},600)}
 $("fList").addEventListener("click",e=>{
@@ -1897,7 +1898,7 @@ $("fxFile").onchange=async e=>{
   if(j.fxDays&&typeof j.fxDays==="object"){const [lo,hi]=fxRange(),o=fxDays();
     Object.entries(j.fxDays).forEach(([d,v])=>{if(d<lo||d>hi||!v||!Array.isArray(v.list))return;if(o.days[d]&&(o.days[d].at||0)>=(v.at||0))return;
       o.days[d]={at:v.at||j.exportedAt||Date.now(),list:v.list.map(slimKeep)};fd++});
-    if(fd){ls.set("tacboard.fxDays",o);gotoDay(false)}}
+    if(fd){ls.set("tacboard.fxDays",o);gotoDay(false);renderTeamFx()}}
   if(Array.isArray(j.teams)){const t=myTeams();j.teams.forEach(x=>{if(x&&x.id&&!t.some(y=>y.id===x.id)){t.push({id:x.id,name:x.name||""});ft++}});
     if(ft){ls.set("tacboard.teams",t);renderTeams();if(lastFx)renderFixtures(lastFx);promptCheck()}}
   /* the open match may be one of the updated ones: reload its extras into the session */
@@ -1914,7 +1915,18 @@ function toggleTeam(id,name){let t=myTeams();t=t.some(x=>x.id===id)?t.filter(x=>
 function renderTeams(){const t=myTeams();
   $("tmList").innerHTML=t.length?t.map(x=>`<span class="tmchip">${logo(x.id)}${esc(tName(x.id,x.name))}<button class="del" data-unstar="${x.id}" aria-label="${esc(x.name)}の登録を外す">外す</button></span>`).join("")
     :`<span class="hint">試合一覧や読み込んだ試合のチーム名の横の ☆ を押すと登録できます</span>`;
-  $("tmCheck").disabled=!t.length}
+  $("tmCheck").disabled=!t.length;renderTeamFx()}
+/* registered teams' matches across the saved day lists (yesterday..tomorrow), no API; days not searched yet are named */
+function renderTeamFx(){const ids=new Set(myTeams().map(x=>x.id)),box=$("tmFxBox");if(!ids.size){box.hidden=true;return}box.hidden=false;
+  const o=fxDays(),[lo,hi]=fxRange(),days=[lo,shiftDate(lo,1),hi],rows=[];
+  days.forEach(d=>{const v=o.days[d];if(v)v.list.filter(f=>ids.has(f.teams.home.id)||ids.has(f.teams.away.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp).forEach(f=>rows.push([d,f]))});
+  const miss=days.filter(d=>!o.days[d]).map(d=>d.slice(5).replace("-","/"));
+  $("tmFx").innerHTML=rows.map(([d,f])=>`<li><span class="ko" style="font-size:13px">${esc(d.slice(5).replace("-","/"))}<span class="kot">${esc(f.fixture.date.slice(11,16))}</span></span>
+      <span class="vs"><span class="lg">${lgLogo(f.league.id)}${esc(lgName(f.league.id,f.league.name))}</span>${logo(f.teams.home.id)}${esc(tName(f.teams.home.id,f.teams.home.name))} vs ${logo(f.teams.away.id)}${esc(tName(f.teams.away.id,f.teams.away.name))}</span>
+      <button class="ghost" data-tmfx="${f.fixture.id}">読み込む</button></li>`).join("")
+    +(rows.length?"":`<li style="display:block" class="empty">保存済みの一覧に登録チームの試合はありません。</li>`)
+    +(miss.length?`<li style="display:block" class="hint">${esc(miss.join("・"))} はまだ検索していないので含まれていません。</li>`:"")}
+$("tmFx").addEventListener("click",e=>{const b=e.target.closest("[data-tmfx]");if(b)loadFixture(+b.dataset.tmfx,"tmMsg")});
 $("tmList").addEventListener("click",e=>{const b=e.target.closest("[data-unstar]");if(b){const t=myTeams().find(x=>x.id===+b.dataset.unstar);if(t)toggleTeam(t.id,t.name)}});
 function promptCheck(){const last=ls.get("tacboard.teamCheck",0);
   $("tmPrompt").hidden=!(myTeams().length&&ls.get("tacboard.apikey","")&&Date.now()-last>CHECK_EVERY)}
@@ -1924,7 +1936,7 @@ async function checkTeams(){
   let saved=0;
   try{
     for(const date of [shiftDate(todayJST(),-1),todayJST()]){
-      const list=await api(`fixtures?date=${date}&timezone=Asia/Tokyo`);
+      const list=await api(`fixtures?date=${date}&timezone=Asia/Tokyo`);putFxDay(date,Date.now(),list,true);
       for(const f of list){
         if(!(ids.has(f.teams.home.id)||ids.has(f.teams.away.id))||!isDone(f)||ls.get("tacboard.match."+f.fixture.id,null))continue;
         const data=await fetchMatch(f);if(data){storeMatch(f,data);saved++}
