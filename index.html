@@ -418,7 +418,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <div class="ed filebox">
     <div class="frow"><button class="ghost" id="fxExport">書き出す</button><button class="ghost" id="fxImport">ファイルから読み込む</button>
       <input type="file" id="fxFile" accept=".json,application/json" hidden></div>
-    <p class="hint">読み込んだ試合(保存した配置を含む)・選手情報・試合の検索一覧(前日〜翌日)・登録チームを1つのファイルにします。「ファイル」アプリ(iCloud Drive など)に保存して、別の端末やバックアップに使えます。同じ試合で内容(保存した配置など)が違うときは、「別の内容」として時点つきで追加します。</p>
+    <p class="hint">読み込んだ試合(保存した配置を含む)・選手情報・試合の検索一覧(前日〜翌日)・登録チーム・設定(リーグの選択、日本代表だけ、日本語表示、盤面の表示、読み込み方。APIキーは含みません)を1つのファイルにします。「ファイル」アプリ(iCloud Drive など)に保存して、別の端末やバックアップに使えます。同じ試合で内容(保存した配置など)が違うときは、「別の内容」として時点つきで追加します。</p>
     <div class="fmsg" id="fxMsg"></div>
     </div>
   </details>
@@ -464,7 +464,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106122145">20261106122145</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106122712">20261106122712</span></p>
 </div>
 
 <script>
@@ -1843,6 +1843,14 @@ function mergePinfo(all){let n=0;const idx=ls.get("tacboard.pinfoIdx",{});
     idx[tid]=Math.max(idx[tid]||0,list[list.length-1].at);n++});
   Object.keys(idx).sort((a,b)=>idx[b]-idx[a]).slice(PI_TEAMS).forEach(k=>{ls.del(piKey(k));delete idx[k]});
   ls.set("tacboard.pinfoIdx",idx);return n}
+/* display / search settings travel with the file (the API key never does); stored as the raw localStorage strings */
+const SET_KEYS=["tacboard.leagues","tacboard.allLeagues","tacboard.japan","tacboard.ja","tacboard.marks","tacboard.faces","tacboard.loadMode"];
+function getSettings(){const o={};SET_KEYS.forEach(k=>{try{const v=localStorage.getItem(k);if(v!=null)o[k.slice(9)]=v}catch(e){}});return o}
+function applySettings(o){if(!o||typeof o!=="object")return 0;let n=0;
+  SET_KEYS.forEach(k=>{const v=o[k.slice(9)];if(typeof v!=="string")return;try{if(localStorage.getItem(k)!==v){localStorage.setItem(k,v);n++}}catch(e){}});
+  if(n){JA=ls.get("tacboard.ja",true);$("nmJa").checked=JA;$("showFaces").checked=facesOn();$("showMarks").checked=marksOn();
+    document.querySelectorAll('input[name="loadMode"]').forEach(r=>{r.checked=r.value===loadMode()});renderLeagues();refreshNames()}
+  return n}
 $("fxExport").onclick=async()=>{
   const rec=ls.get("tacboard.recent",[]);
   const items=rec.map(r=>{const data=ls.get("tacboard.match."+r.id,null);if(!data)return null;const shape=ls.get(matchKey(data),null);
@@ -1851,7 +1859,7 @@ $("fxExport").onclick=async()=>{
   if(!items.length&&!nd&&!teams.length){fmsg("fxMsg","書き出す試合がありません",true);return}
   const now=Date.now(),stamp=new Date(now+9*3600e3).toISOString().slice(0,16).replace(/[-:]/g,"").replace("T","-");
   const pinfo={};Object.keys(ls.get("tacboard.pinfoIdx",{})).forEach(tid=>{const l=piSnaps(tid);if(l.length)pinfo[tid]=l});
-  const name=`tactics-board-${stamp}.json`,text=JSON.stringify({app:"tactics-board",kind:"matches",version:1,exportedAt:now,items,pinfo,pinfoMax:piMax(),fxDays:fxd,teams});
+  const name=`tactics-board-${stamp}.json`,text=JSON.stringify({app:"tactics-board",kind:"matches",version:1,exportedAt:now,items,pinfo,pinfoMax:piMax(),fxDays:fxd,teams,settings:getSettings()});
   const ext=`${nd?`・試合一覧 ${nd} 日分`:""}${teams.length?`・登録チーム ${teams.length}`:""}`;
   const file=new File([text],name,{type:"application/json"});
   try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});fmsg("fxMsg",`${items.length} 試合${pc(pinfo)}${ext}を書き出しました`);return}}
@@ -1885,7 +1893,7 @@ $("fxFile").onchange=async e=>{
   if(j.pinfoMax&&!piMax())ls.set("tacboard.pinfoMax",j.pinfoMax);
   const pn=mergePinfo(j.pinfo);
   /* search lists: only dates still in range, the newer list wins; registered teams: added to this device's */
-  let fd=0,ft=0;
+  let fd=0,ft=0;const sn=applySettings(j.settings);
   if(j.fxDays&&typeof j.fxDays==="object"){const [lo,hi]=fxRange(),o=fxDays();
     Object.entries(j.fxDays).forEach(([d,v])=>{if(d<lo||d>hi||!v||!Array.isArray(v.list))return;if(o.days[d]&&(o.days[d].at||0)>=(v.at||0))return;
       o.days[d]={at:v.at||j.exportedAt||Date.now(),list:v.list.map(slimKeep)};fd++});
@@ -1895,7 +1903,7 @@ $("fxFile").onchange=async e=>{
   /* the open match may be one of the updated ones: reload its extras into the session */
   const oid=entryId(S.data),od=oid&&ls.get("tacboard.match."+oid,null);if(od&&fillExtras(S.data,od)){save();render()}
   renderRecent();
-  fmsg("fxMsg",`読み込みました: 追加 ${added} 件 / 別の内容として追加 ${copies} 件 / 同じ内容のため省略 ${same} 件${filled?`(うち欠場者・スタッツ等を補った ${filled} 件)`:""}${pn?` / 選手情報 ${pn} チーム`:""}${fd?` / 試合一覧 ${fd} 日分`:""}${ft?` / 登録チーム ${ft} 件`:""}`);
+  fmsg("fxMsg",`読み込みました: 追加 ${added} 件 / 別の内容として追加 ${copies} 件 / 同じ内容のため省略 ${same} 件${filled?`(うち欠場者・スタッツ等を補った ${filled} 件)`:""}${pn?` / 選手情報 ${pn} チーム`:""}${fd?` / 試合一覧 ${fd} 日分`:""}${ft?` / 登録チーム ${ft} 件`:""}${sn?` / 設定 ${sn} 項目`:""}`);
 };
 
 /* ---------- registered teams: confirm, then fetch their finished matches of yesterday and today ---------- */
