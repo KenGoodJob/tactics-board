@@ -231,6 +231,8 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .ev .evn{font-size:11px;color:var(--muted);margin-left:2px}
 .ev .pn{text-decoration:underline dotted;text-underline-offset:3px}
 .ev .pn img.face,.pst td img.face{width:20px;height:20px;vertical-align:-5px;margin-right:3px}
+.fxlist .seen{display:flex;align-items:center;gap:3px;font-size:12px;color:var(--muted);white-space:nowrap}
+.fxlist .seen input{width:18px;height:18px;margin:0}
 .fxlist .kot{display:block;font-size:11px;font-weight:500;color:var(--muted)}
 .pst .cap{display:inline-block;margin-left:4px;padding:0 4px;border-radius:3px;font-size:10px;font-weight:700;line-height:15px;color:#fff;background:var(--accent);vertical-align:1px;text-decoration:none}
 .pst td.pn{text-decoration:underline dotted;text-underline-offset:3px}
@@ -465,7 +467,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106134221">20261106134221</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106135122">20261106135122</span></p>
 </div>
 
 <script>
@@ -976,7 +978,7 @@ function renderFmSelects(){
 /* ---------- time controls ---------- */
 $("steps").addEventListener("click",e=>{const b=e.target.closest("[data-step]");if(!b)return;step(+b.dataset.step);renderTime();save()});
 $("segChips").addEventListener("click",e=>{const b=e.target.closest("[data-seg]");if(!b)return;jump(b.dataset.seg);renderTime();save()});
-$("tnow").onclick=()=>{S.applied=norm(S.pending);BENCH_POS={};undoClear();save();render()};
+$("tnow").onclick=()=>{S.applied=norm(S.pending);BENCH_POS={};undoClear();save();render();if(S.applied.seg==="FT"){const id=entryId(S.data);if(id)setSeen(id,true)}};
 /* tapping a time in 反映済みの出来事 moves the clock back there and applies it (already seen, so nothing new is revealed) */
 $("log").addEventListener("click",e=>{
   const pi=e.target.closest("[data-pinfo]");if(pi){openPinfo(pi.dataset.pinfo);return}
@@ -1731,10 +1733,15 @@ const MAX_RECENT=40;
 const entryId=d=>d&&d.fixture?String(d.fixture)+(d.copy?"~"+d.copy:""):null;
 const fmtAt=t=>{const d=new Date(t+9*3600e3).toISOString();return `${d.slice(5,7)}/${d.slice(8,10)} ${d.slice(11,16)}`};
 function putRecent(entry){
-  let rec=ls.get("tacboard.recent",[]).filter(r=>String(r.id)!==String(entry.id));rec.unshift(entry);
+  const all=ls.get("tacboard.recent",[]),old=all.find(r=>String(r.id)===String(entry.id));
+  if(old&&old.seen&&entry.seen==null)entry.seen=true;   /* re-saving the same match keeps its 観戦済み mark */
+  let rec=all.filter(r=>String(r.id)!==String(entry.id));rec.unshift(entry);
   rec.slice(MAX_RECENT).forEach(r=>{const c=ls.get("tacboard.match."+r.id,null);if(c)ls.del(matchKey(c));ls.del("tacboard.match."+r.id)});
   ls.set("tacboard.recent",rec.slice(0,MAX_RECENT));
 }
+/* 観戦済み mark on a saved match: set by hand in the list, or automatically when 試合終了 is applied */
+function setSeen(id,v){const rec=ls.get("tacboard.recent",[]),r=rec.find(x=>String(x.id)===String(id));if(!r||!!r.seen===!!v)return;
+  if(v)r.seen=true;else delete r.seen;ls.set("tacboard.recent",rec);renderRecent()}
 function touchRecent(d){const id=entryId(d);if(!id)return;const rec=ls.get("tacboard.recent",[]),r=rec.find(x=>String(x.id)===id);
   if(r){r.at=Date.now();ls.set("tacboard.recent",rec)}}
 function storeMatch(f,data){
@@ -1801,8 +1808,9 @@ function renderRecent(){
   const koT=r=>{const c=ls.get("tacboard.match."+r.id,null),k=c&&c.kickoff;return k?new Date(k+9*3600e3).toISOString().slice(11,16):""};   /* kickoff time (JST) from the saved match; older ones have none */
   $("fRecent").innerHTML=rec.map(r=>{const kt=koT(r);return `<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}${kt?`<span class="kot">${esc(kt)}</span>`:""}</span>
     <span class="vs"><span class="lg">${lgLogo(recentLg(r))}${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${r.home&&r.away?`${star(r.home)}${logo(r.home.id)}${esc(tName(r.home.id,r.home.name))} vs ${star(r.away)}${logo(r.away.id)}${esc(tName(r.away.id,r.away.name))}`:esc(r.label)}</span>
-    <span style="display:flex;gap:6px"><button class="ghost" data-open="${esc(r.id)}">開く</button><button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`}).join("");
+    <span style="display:flex;gap:6px;align-items:center"><label class="seen"><input type="checkbox" data-seen="${esc(r.id)}"${r.seen?" checked":""}>観戦済み</label><button class="ghost" data-open="${esc(r.id)}">開く</button><button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`}).join("");
 }
+$("fRecent").addEventListener("change",e=>{const c=e.target.closest("[data-seen]");if(c)setSeen(c.dataset.seen,c.checked)});
 $("fRecent").addEventListener("click",e=>{
   const st=e.target.closest("[data-star]");if(st){toggleTeam(+st.dataset.star,st.dataset.name);return}
   const o=e.target.closest("[data-open]"),d=e.target.closest("[data-forget]");
@@ -1855,7 +1863,7 @@ function applySettings(o){if(!o||typeof o!=="object")return 0;let n=0;
 $("fxExport").onclick=async()=>{
   const rec=ls.get("tacboard.recent",[]);
   const items=rec.map(r=>{const data=ls.get("tacboard.match."+r.id,null);if(!data)return null;const shape=ls.get(matchKey(data),null);
-    return {id:String(r.id),date:r.date,label:r.label,lg:r.lg,lgId:recentLg(r),home:r.home||null,away:r.away||null,at:Math.max(r.at||0,shape&&shape.at||0)||null,copy:r.copy||null,data,shape}}).filter(Boolean);
+    return {id:String(r.id),date:r.date,label:r.label,lg:r.lg,lgId:recentLg(r),home:r.home||null,away:r.away||null,at:Math.max(r.at||0,shape&&shape.at||0)||null,copy:r.copy||null,seen:!!r.seen,data,shape}}).filter(Boolean);
   const fxd=fxDays().days,teams=myTeams(),nd=Object.keys(fxd).length;
   if(!items.length&&!nd&&!teams.length){fmsg("fxMsg","書き出す試合がありません",true);return}
   const now=Date.now(),stamp=new Date(now+9*3600e3).toISOString().slice(0,16).replace(/[-:]/g,"").replace("T","-");
@@ -1880,7 +1888,7 @@ $("fxFile").onchange=async e=>{
     const rec=ls.get("tacboard.recent",[]);
     const mine=rec.filter(r=>String(r.id).split("~")[0]===base).map(r=>{const data=ls.get("tacboard.match."+r.id,null);return data?{r,data,shape:ls.get(matchKey(data),null)}:null}).filter(Boolean);
     const hit=mine.find(m=>sameContent(strip(m),incoming));
-    if(hit){same++;if(fillExtras(hit.data,it.data)){ls.set("tacboard.match."+hit.r.id,hit.data);filled++}return}
+    if(hit){same++;if(it.seen)setSeen(hit.r.id,true);if(fillExtras(hit.data,it.data)){ls.set("tacboard.match."+hit.r.id,hit.data);filled++}return}
     const at=it.at||j.exportedAt||Date.now();let copy=null;
     if(mine.length){copy=new Date(at+9*3600e3).toISOString().slice(0,16).replace(/[-:T]/g,"");let k=copy,n=2;
       while(rec.some(r=>String(r.id)===base+"~"+k))k=copy+"-"+(n++);copy=k}
@@ -1888,7 +1896,7 @@ $("fxFile").onchange=async e=>{
     ls.set("tacboard.match."+id,data);
     if(incoming.s)ls.set(matchKey(data),{...incoming.s,at});else ls.del(matchKey(data));
     const tm=s=>it[s]&&it[s].id?it[s]:(data.teams[s].apiId?{id:data.teams[s].apiId,name:data.teams[s].name}:null);
-    putRecent({id,date:it.date||"",label:it.label||`${data.teams.home.name} vs ${data.teams.away.name}`,lg:it.lg||"",lgId:it.lgId||data.info&&data.info.lgId||null,at,copy,home:tm("home"),away:tm("away")});
+    putRecent({id,date:it.date||"",label:it.label||`${data.teams.home.name} vs ${data.teams.away.name}`,lg:it.lg||"",lgId:it.lgId||data.info&&data.info.lgId||null,at,copy,home:tm("home"),away:tm("away"),seen:it.seen?true:undefined});
     copy?copies++:added++;
   });
   if(j.pinfoMax&&!piMax())ls.set("tacboard.pinfoMax",j.pinfoMax);
