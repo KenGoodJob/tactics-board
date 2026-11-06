@@ -264,7 +264,12 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
 .field{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);min-width:0}
 .field input,.field select,.field textarea,.evform select,.evform input{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:6px 8px;color:var(--fg);font-size:14px;min-width:0}
 .field textarea{min-height:240px;font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.5;resize:vertical}
-.row2{display:grid;grid-template-columns:1fr 64px 110px;gap:8px}
+.row2{display:grid;grid-template-columns:1fr 110px;gap:8px}
+.kitbox{display:flex;flex-wrap:wrap;gap:12px 28px;padding:0 16px 14px}
+.kitbox .kt{display:flex;flex-direction:column;gap:6px;min-width:0}
+.kitbox h3{margin:0;font-size:15px}
+.kitbox .kr{display:flex;gap:10px}
+.kitbox input[type=color]{width:64px;padding:2px;height:36px}
 .hint{font-size:12px;color:var(--muted);margin:0}
 .evform{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end}
 .evform .field{flex:0 1 auto}
@@ -355,6 +360,12 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <section class="panel"><h2 id="benchATitle">Away</h2><ul class="plist" id="benchA"></ul></section>
   </div>
   <section class="panel" id="secInj"><h2>欠場・出場微妙</h2><div id="inj"></div></section>
+
+  <details class="editor" id="secKit">
+    <summary>ユニフォームの色<span class="safe">出来事は表示しません</span></summary>
+    <div class="kitbox" id="kitBox"></div>
+    <p class="hint" style="padding:0 16px 14px;margin:0">試合データに色が入っていない試合は、ここで直せます。背番号の色は、シャツの色と近すぎるときだけ自動で白か黒に変わります。</p>
+  </details>
 
   <details class="editor finder" id="finder">
     <summary>試合を探して読み込む<span class="safe">スコアや結果は表示しません</span></summary>
@@ -463,11 +474,11 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
   <div class="pcard" id="mcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-label="試合情報" id="mcBox"></div></div>
   <nav class="jump" aria-label="ページ内の移動"><div class="jmenu" id="jumpMenu" hidden>
     <button data-jump="top">スコア</button><button data-jump="secTime">時間</button><button data-jump="secBoard">盤面</button>
-    <button data-jump="secPoss">配置</button><button data-jump="secLog">出来事</button><button data-jump="secPlayers">選手一覧</button><button data-jump="secInj">欠場者</button>
+    <button data-jump="secPoss">配置</button><button data-jump="secLog">出来事</button><button data-jump="secPlayers">選手一覧</button><button data-jump="secInj">欠場者</button><button data-jump="secKit">ユニフォームの色</button>
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106140147">20261106140147</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106152530">20261106152530</span></p>
 </div>
 
 <script>
@@ -1150,8 +1161,6 @@ function teamEditor(t){
     <h3 style="margin:0;font-size:15px">${t==="home"?"ホーム":"アウェイ"}</h3>
     <div class="row2">
       <label class="field">チーム名<input id="ed-${t}-name" value="${esc(T.name)}"></label>
-      <label class="field">色<input type="color" id="ed-${t}-color" value="${esc(T.color)}" style="padding:2px;height:36px"></label>
-      <label class="field">GKの色<input type="color" id="ed-${t}-gkc" value="${esc(T.gkColor||"#e9e4d6")}" style="padding:2px;height:36px"></label>
       <label class="field">システム<input id="ed-${t}-fm" value="${esc(T.formation)}" placeholder="4-2-3-1"></label>
     </div>
     <label class="field">選手(1行に「背番号 名前」)<textarea id="ed-${t}-pl" spellcheck="false">${esc(st+"\n---\n"+bn)}</textarea></label>
@@ -1168,12 +1177,22 @@ function parsePl(t,text){
     out.push({id,num,name,...(old.apiId!=null?{apiId:old.apiId}:{}),...(old.pos?{pos:old.pos}:{}),starter})});
   return out;
 }
+/* ユニフォームの色: kept outside 試合データを編集 (which reveals events) so the colours can be fixed mid-match without spoilers */
+function renderKit(){
+  $("kitBox").innerHTML=["home","away"].map(t=>{const T=S.data.teams[t];
+    return `<div class="kt"><h3>${t==="home"?"ホーム":"アウェイ"} <span style="font-weight:400;font-size:13px;color:var(--muted)">${esc(tName(T.apiId,T.name))}</span></h3>
+    <div class="kr"><label class="field">チームの色<input type="color" id="kit-${t}-color" value="${esc(T.color)}"></label>
+    <label class="field">GKの色<input type="color" id="kit-${t}-gkc" value="${esc(T.gkColor||"#e9e4d6")}"></label></div></div>`}).join("");
+  ["home","away"].forEach(t=>{
+    $(`kit-${t}-color`).oninput=e=>{S.data.teams[t].color=e.target.value;commit(false)};
+    $(`kit-${t}-gkc`).oninput=e=>{S.data.teams[t].gkColor=e.target.value;commit(false)};
+  });
+}
 function renderEditor(){
+  renderKit();
   $("edTeams").innerHTML=teamEditor("home")+teamEditor("away");
   ["home","away"].forEach(t=>{
-    $(`ed-${t}-name`).onchange=e=>{S.data.teams[t].name=e.target.value;commit()};
-    $(`ed-${t}-color`).oninput=e=>{S.data.teams[t].color=e.target.value;commit(false)};
-    $(`ed-${t}-gkc`).oninput=e=>{S.data.teams[t].gkColor=e.target.value;commit(false)};
+    $(`ed-${t}-name`).onchange=e=>{S.data.teams[t].name=e.target.value;commit();renderKit()};
     $(`ed-${t}-fm`).onchange=e=>{S.data.teams[t].formation=e.target.value.trim();commit()};
     $(`ed-${t}-pl`).onchange=e=>{S.data.teams[t].players=parsePl(t,e.target.value);commit()};
   });
@@ -1275,7 +1294,7 @@ const pShort=p=>{const e=JA&&plJa(p);return e&&e[0]?(e[NAMES.format>=2?1:2]||e[0
 async function loadNames(){try{const r=await fetch("names.json",{cache:"no-cache"});if(!r.ok)return "fail";const j=await r.json();
   if(!j||typeof j.teams!=="object"||typeof j.players!=="object")return "fail";if(JSON.stringify(j)===JSON.stringify(NAMES))return "same";
   NAMES=j;ls.set("tacboard.names",j);refreshNames();return "new"}catch(e){return "fail"}}
-function refreshNames(){render();renderRecent();renderTeams();if(lastFx)renderFixtures(lastFx);renderNameBox();if(!$("pcard").hidden)renderPinfo();if(!$("mcard").hidden)renderMinfo()}
+function refreshNames(){render();renderKit();renderRecent();renderTeams();if(lastFx)renderFixtures(lastFx);renderNameBox();if(!$("pcard").hidden)renderPinfo();if(!$("mcard").hidden)renderMinfo()}
 /* names still missing: teams seen in searches, and teams / players of saved matches and the open match */
 function noteTeams(list){const ask=ls.get("tacboard.nameAsk",{});let ch=false;
   list.forEach(([t,lg])=>{if(t&&t.id!=null&&!teamJa(t.id,t.name)&&!ask[t.id]){ask[t.id]=[t.name,lg||""];ch=true}});
