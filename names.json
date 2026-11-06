@@ -618,6 +618,8 @@
   "13": ["ダン=アクセル・ザガドゥ", "ザガドゥ"]
 },
 "leagues": {
+  "7": ["アジアカップ", "Asian Cup"],
+  "30": ["W杯アジア予選", "Qualification Asia"],
   "40": ["チャンピオンシップ", "Championship"],
   "41": ["EFLリーグ1", "League One"],
   "45": ["FAカップ", "FA Cup"],

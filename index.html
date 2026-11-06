@@ -464,7 +464,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106123514">20261106123514</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106124003">20261106124003</span></p>
 </div>
 
 <script>
@@ -1362,7 +1362,7 @@ const star=t=>{const on=myTeams().some(x=>x.id===t.id);return `<button class="st
 let lastFx=null;
 /* keyword: every word must appear in a team, league or country name (English or Japanese); ignores the league checks */
 function kwHit(f,kw){const l=f.league,h=f.teams.home,a=f.teams.away;
-  const hay=[h.name,a.name,tName(h.id,h.name),tName(a.id,a.name),l.name,lgName(l.id,l.name),l.country,NAT_JA[l.country]||""].join(" "),low=hay.toLowerCase(),fh=fold(hay);
+  const hay=[h.name,a.name,tName(h.id,h.name),tName(a.id,a.name),l.name,lgName(l.id,l.name),l.country,NAT_JA[l.country]||"",NAT_JA[h.name]||"",NAT_JA[a.name]||""].join(" "),low=hay.toLowerCase(),fh=fold(hay);
   return kw.split(/[\s　、,]+/).filter(Boolean).every(w=>low.includes(w.toLowerCase())||(fold(w)&&fh.includes(fold(w))))}
 $("fKw").addEventListener("input",()=>{if(lastFx)renderFixtures(lastFx)});
 $("fKw").addEventListener("keydown",e=>{if(e.key==="Enter")e.target.blur()});
