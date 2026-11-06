@@ -478,7 +478,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106152530">20261106152530</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106153208">20261106153208</span></p>
 </div>
 
 <script>
@@ -935,7 +935,7 @@ function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier,rt}){
     ${gk?`<circle r="2.95" fill="none" stroke="${col}" stroke-width=".45"/>`:""}
     <circle class="pbg" r="2.4" fill="${face?"#dfe2dc":bg}" data-fill="${bg}" stroke="rgba(0,0,0,.45)" stroke-width=".25"/>
     <text class="pnum"${face?` visibility="hidden"`:""} y=".85" text-anchor="middle" font-size="2.3" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="${fg}">${esc(p.num)}</text>
-    ${face?`<image class="face" href="${esc(fu)}" x="-2.3" y="-2.3" width="4.6" height="4.6" clip-path="url(#fc)" preserveAspectRatio="xMidYMin slice" pointer-events="none"/><circle class="facering" r="2.4" fill="none" stroke="${col}" stroke-width=".55"/>`:""}
+    ${face?`<image class="face" href="${esc(fu)}" x="-2.3" y="-2.3" width="4.6" height="4.6" clip-path="url(#fc)" preserveAspectRatio="xMidYMin slice" pointer-events="none"/><circle class="facering" r="2.4" fill="none" stroke="${gk?bg:col}" stroke-width=".55"/>`:""}
     ${markSvg(m,showM)}
     ${rt?ratingSvg(rt[p.id]):""}
     <text class="pname" data-plain="${esc(sh)}" y="${ly}" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(face&&p.num!==""?p.num+" "+sh:sh)}</text>
@@ -1186,6 +1186,8 @@ function renderKit(){
   ["home","away"].forEach(t=>{
     $(`kit-${t}-color`).oninput=e=>{S.data.teams[t].color=e.target.value;commit(false)};
     $(`kit-${t}-gkc`).oninput=e=>{S.data.teams[t].gkColor=e.target.value;commit(false)};
+    /* when the picker closes, keep the colours in the saved match too (so they survive closing the app and go into the backup file) */
+    [`kit-${t}-color`,`kit-${t}-gkc`].forEach(id=>$(id).onchange=()=>{keepStats();touchRecent(S.data)});
   });
 }
 function renderEditor(){
@@ -1845,14 +1847,14 @@ $("fRecent").addEventListener("click",e=>{
 
 /* ---------- export / import of saved matches as a file (for the Files app / iCloud Drive) ---------- */
 const sameContent=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
-const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.inj;delete d.kickoff;delete d.season;delete d.info;delete d.apiScore;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach;KIT.forEach(k=>delete d.teams[t][k]);if(Array.isArray(d.teams[t].players))d.teams[t].players=d.teams[t].players.map(p=>{const q={...p};delete q.pos;return q})}})}if(Array.isArray(d.events))d.events=baseEvents(d.events);const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
+const strip=it=>{const d={...it.data};delete d.copy;delete d.stats;delete d.inj;delete d.kickoff;delete d.season;delete d.info;delete d.apiScore;if(d.teams){d.teams={...d.teams};["home","away"].forEach(t=>{if(d.teams[t]){d.teams[t]={...d.teams[t]};delete d.teams[t].coach;KIT_ALL.forEach(k=>delete d.teams[t][k]);if(Array.isArray(d.teams[t].players))d.teams[t].players=d.teams[t].players.map(p=>{const q={...p};delete q.pos;return q})}})}if(Array.isArray(d.events))d.events=baseEvents(d.events);const s=it.shape?{...it.shape}:null;if(s)delete s.at;return {d,s}};
 const pc=o=>{const n=Object.keys(o).length;return n?`と ${n} チームの選手情報`:""};
 /* fill what the saved copy lacks from an imported copy of the same match (injuries, stats, match info, coaches, kickoff, season, positions) */
 /* kit colours and the event details added later (penalty goals, missed penalties, VAR, card reasons) do not make a copy "different" */
-const KIT=["numColor","gkColor","gkNum"];
+const KIT=["numColor","gkColor","gkNum"],KIT_ALL=["color",...KIT];
 const baseEvents=evs=>evs.filter(e=>e.type!=="var"&&e.type!=="pen_miss").map(e=>{const q={...e};delete q.id;delete q.pen;delete q.why;delete q.note;return q});
 const evExtra=evs=>(evs||[]).filter(e=>e.type==="var"||e.type==="pen_miss"||e.pen||e.why).length;
-function fillExtras(d,src){let ch=false;
+function fillExtras(d,src,newer=false){let ch=false;   /* newer: the file's copy was saved later, so its uniform colours (possibly fixed by hand) win */
   if(Array.isArray(src.events)&&evExtra(src.events)>evExtra(d.events)&&sameContent(baseEvents(src.events),baseEvents(d.events||[]))){d.events=src.events;ch=true}const has=v=>v!=null&&!(typeof v==="object"&&!Object.keys(v).length);
   ["kickoff","season"].forEach(k=>{if(!has(d[k])&&has(src[k])){d[k]=src[k];ch=true}});
   if(has(src.info)){if(!has(d.info)){d.info=src.info;ch=true}else Object.keys(src.info).forEach(k=>{if(!has(d.info[k])&&has(src.info[k])){d.info[k]=src.info[k];ch=true}})}
@@ -1860,7 +1862,7 @@ function fillExtras(d,src){let ch=false;
   if(has(src.apiScore)&&!has(d.apiScore)){d.apiScore=src.apiScore;ch=true}
   if(has(src.stats)){if(!has(d.stats)){d.stats=src.stats;ch=true}else Object.keys(src.stats).forEach(k=>{if(!has(d.stats[k])&&has(src.stats[k])){d.stats[k]=src.stats[k];ch=true}})}
   ["home","away"].forEach(t=>{const a=d.teams&&d.teams[t],b=src.teams&&src.teams[t];if(a&&b&&!a.coach&&b.coach){a.coach=b.coach;ch=true}
-    if(a&&b)KIT.forEach(k=>{if(!a[k]&&b[k]){a[k]=b[k];ch=true}});
+    if(a&&b)KIT_ALL.forEach(k=>{if(b[k]&&(!a[k]||newer&&a[k]!==b[k])){a[k]=b[k];ch=true}});
     if(a&&b&&Array.isArray(a.players)&&Array.isArray(b.players))a.players.forEach(p=>{const q=b.players.find(x=>x.id===p.id);if(!p.pos&&q&&q.pos){p.pos=q.pos;ch=true}})});
   return ch}
 /* merge imported player-info snapshots: newest per season (single-player fetches of the older one are kept), newest PI_KEEP */
@@ -1910,7 +1912,7 @@ $("fxFile").onchange=async e=>{
     const rec=ls.get("tacboard.recent",[]);
     const mine=rec.filter(r=>String(r.id).split("~")[0]===base).map(r=>{const data=ls.get("tacboard.match."+r.id,null);return data?{r,data,shape:ls.get(matchKey(data),null)}:null}).filter(Boolean);
     const hit=mine.find(m=>sameContent(strip(m),incoming));
-    if(hit){same++;if(it.seen)setSeen(hit.r.id,true);if(fillExtras(hit.data,it.data)){ls.set("tacboard.match."+hit.r.id,hit.data);filled++}return}
+    if(hit){same++;if(it.seen)setSeen(hit.r.id,true);if(fillExtras(hit.data,it.data,(it.at||0)>(hit.r.at||0))){ls.set("tacboard.match."+hit.r.id,hit.data);filled++}return}
     const at=it.at||j.exportedAt||Date.now();let copy=null;
     if(mine.length){copy=new Date(at+9*3600e3).toISOString().slice(0,16).replace(/[-:T]/g,"");let k=copy,n=2;
       while(rec.some(r=>String(r.id)===base+"~"+k))k=copy+"-"+(n++);copy=k}
