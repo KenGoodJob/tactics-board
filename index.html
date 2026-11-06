@@ -150,6 +150,7 @@ details.editor>summary span.safe{color:var(--muted)}
 .fxlist .ghost{padding:5px 12px;font-size:13px}
 h3.sub{margin:4px 0 0;font-size:13px;color:var(--muted);font-weight:500}
 .keybox>summary{cursor:pointer;font-size:14px;color:var(--muted)}
+.keybox .quota{font-size:12px;margin-left:10px;display:inline-block}
 
 /* lower panels */
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -368,7 +369,6 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       <label class="field kw">キーワードで探す(リーグの選択に関係なく、その日の全試合から)<input type="search" id="fKw" placeholder="例: オランダ、エールディヴィジ、Ajax" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"></label>
       <div class="lgs" id="fLeagues"></div>
       <div class="fmsg" id="fMsg"></div>
-      <div class="hint" id="fQuota"></div>
       <ul class="fxlist" id="fList"></ul>
       <div class="tmbox" id="tmBox">
         <h3 class="sub">登録チーム</h3>
@@ -399,7 +399,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
         <button class="ghost" id="testOpen">開く</button>
       </div>
       <details class="keybox" id="keyBox">
-        <summary>APIキーの設定</summary>
+        <summary>APIキーの設定<span class="quota" id="fQuota"></span></summary>
         <div class="ed" style="padding:10px 0 0">
           <p class="hint">API-Footballのダッシュボードで発行したキーを入力します。キーはこの端末のブラウザにだけ保存され、GitHubには送られません。</p>
           <div class="frow">
@@ -460,7 +460,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106115225">20261106115225</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106115514">20261106115514</span></p>
 </div>
 
 <script>
