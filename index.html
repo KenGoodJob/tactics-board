@@ -151,6 +151,7 @@ details.editor>summary span.safe{color:var(--muted)}
 h3.sub{margin:4px 0 0;font-size:13px;color:var(--muted);font-weight:500}
 .keybox>summary{cursor:pointer;font-size:14px;color:var(--muted)}
 .keybox .quota{font-size:12px;margin-left:10px;display:inline-block}
+.keybox .qbtn{font-size:12px;padding:2px 10px;margin-left:8px;vertical-align:1px}
 
 /* lower panels */
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -399,14 +400,13 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
         <button class="ghost" id="testOpen">開く</button>
       </div>
       <details class="keybox" id="keyBox">
-        <summary>APIキーの設定<span class="quota" id="fQuota"></span></summary>
+        <summary>APIキーの設定<span class="quota" id="fQuota"></span><button class="ghost qbtn" id="fUsage" type="button">確認</button></summary>
         <div class="ed" style="padding:10px 0 0">
           <p class="hint">API-Footballのダッシュボードで発行したキーを入力します。キーはこの端末のブラウザにだけ保存され、GitHubには送られません。</p>
           <div class="frow">
             <input type="password" id="fKey" autocomplete="off" placeholder="APIキー" style="flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:6px 8px">
             <button class="ghost" id="fKeySave">保存</button>
             <button class="ghost" id="fKeyDel">削除</button>
-            <button class="ghost" id="fUsage">使用回数を確認</button>
           </div>
           <div class="fmsg" id="fKeyMsg"></div>
           <p class="hint" style="margin-top:10px">試合の読み込み方:</p>
@@ -460,7 +460,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106120725">20261106120725</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106121239">20261106121239</span></p>
 </div>
 
 <script>
@@ -1334,8 +1334,8 @@ function renderUsage(){const u=ls.get("tacboard.usage",null);
   $("fQuota").textContent=u&&u.day===utcDay()?`本日のAPI使用: ${u.used} / ${u.limit} 回(毎朝9時にリセット)`:"本日のAPI使用: まだ確認していません(毎朝9時にリセット)"}
 async function checkUsage(){fmsg("fKeyMsg","確認しています…");
   try{const j=await api("status");const q=j&&j.requests;
-    if(q&&q.limit_day>0){setUsage(q.current,q.limit_day);renderKey()}else fmsg("fKeyMsg","使用回数を取得できませんでした",true)}
-  catch(e){fmsg("fKeyMsg",e.message,true)}}
+    if(q&&q.limit_day>0){setUsage(q.current,q.limit_day);renderKey()}else{fmsg("fKeyMsg","使用回数を取得できませんでした",true);$("keyBox").open=true}}
+  catch(e){fmsg("fKeyMsg",e.message,true);$("keyBox").open=true}}
 
 /* league filter */
 function renderLeagues(){
@@ -1931,7 +1931,7 @@ $("tmLater").onclick=()=>{$("tmPrompt").hidden=true};
 function renderKey(){const k=ls.get("tacboard.apikey","");$("fKey").value="";
   fmsg("fKeyMsg",k?`保存済み(末尾 …${k.slice(-4)})`:"まだ保存されていません");if(!k)$("keyBox").open=true}
 $("fKeySave").onclick=()=>{const v=$("fKey").value.trim();if(!v){fmsg("fKeyMsg","キーを入力してください",true);return}ls.set("tacboard.apikey",v);renderKey()};
-$("fUsage").onclick=checkUsage;
+$("fUsage").onclick=e=>{e.preventDefault();e.stopPropagation();checkUsage()};   /* inside the summary: do not open/close the settings */
 $("fKeyDel").onclick=()=>{ls.del("tacboard.apikey");renderKey()};
 
 /* Japanese names: toggle, and hand the missing names to Claude (copy, or a text file via the share sheet) */

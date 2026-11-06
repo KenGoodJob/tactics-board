@@ -96,7 +96,7 @@
 ### 試合データ(API-Football)
 - `https://v3.football.api-sports.io/`、ヘッダー `x-apisports-key`。無料プランは1日100リクエスト(00:00 UTC = 日本時間9時にリセット)
 - **無料プランで取れる日付は前日・当日・翌日だけ**(それ以外は "Free plans do not have access to this date")。日付欄と前日/翌日ボタンもこの範囲に制限している
-- 使用回数: 応答ヘッダー `x-ratelimit-requests-limit/remaining` と `status` エンドポイントの `requests.current/limit_day` から「本日のAPI使用: N / 100 回」を「APIキーの設定」の見出しの横に表示(2026-11-06 にユーザーの依頼で移動。`tacboard.usage` に UTC の日付つきで保存)
+- 使用回数: 応答ヘッダー `x-ratelimit-requests-limit/remaining` と `status` エンドポイントの `requests.current/limit_day` から「本日のAPI使用: N / 100 回」を「APIキーの設定」の見出しの横に表示し、その右に「確認」ボタン(`status` を取得。見出しの中なので設定は開閉しない。失敗時だけ設定を開いてメッセージを出す)(2026-11-06 にユーザーの依頼で移動。`tacboard.usage` に UTC の日付つきで保存)
 - APIキーは画面で入力し、その端末の localStorage にだけ保存する。**リポジトリには絶対に入れない**
 - 検索: `fixtures?date=YYYY-MM-DD&timezone=Asia/Tokyo` を1回。一覧にはキックオフ時刻・リーグ・対戦カードだけを出す(スコアや status は表示もキャッシュもしない)
 - 検索結果の保存(2026-11-06 にユーザーの依頼で追加・変更): 検索のたびにその日付の一覧を `tacboard.fxDays={last,days:{<日付>:{at,list}}}`(slimFx で削った一覧、スコア・status なし)に保存。**無料プランで取れる範囲(前日・当日・翌日)の日付だけ**を残し、範囲外は読み書きのたびに消す。起動時は最後に見た日付(`last`)の一覧を復元(「MM/DD HH:MM 時点の一覧。最新にするには「検索」」)。日付欄の変更・前日/翌日は保存済みの一覧があればそれを出す(API なし)。無ければ前日/翌日は従来どおり検索し、日付欄の変更は「検索」を促す。「検索」は常に取り直す。旧形式 `tacboard.lastFx` は最初に読み込んで消す。終了済みかどうか(done)は検索時点の値なので、まとめて取得では `fixtures?id=` の応答の status で一覧と保存分の両方を上書きする(個別取得では検索時点のまま。終わる前の一覧から読み込むと保存されない)
