@@ -209,7 +209,8 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .badge{font-size:11px;font-weight:700;padding:0 6px;border-radius:4px;color:#fff;white-space:nowrap}
 .empty{color:var(--muted);font-size:13px;margin:0}
 .plist li[data-pinfo],.pn{cursor:pointer}
-.infobtn{margin-top:2px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:1px 10px;font-size:12px;color:var(--muted)}
+.infobtn .logo.lgo{width:14px;height:14px;vertical-align:-2px}
+.infobtn{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:1px 10px;font-size:12px;color:var(--muted)}
 .mcrow{display:flex;align-items:center;gap:8px}
 .injg{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px;margin-bottom:8px}
 .injg h3{margin:0 0 4px;font-size:14px;display:flex;align-items:center;gap:4px}
@@ -458,7 +459,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106113637">20261106113637</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106114312">20261106114312</span></p>
 </div>
 
 <script>
@@ -789,7 +790,7 @@ function render(){
       ${rows.map(r=>r.mk?markerHtml(r):`<div class="c h">${r.home.map(evHtml).join("")}</div><button class="tm" data-t="${esc(r.t)}" aria-label="${esc(r.label)}に移動">${esc(r.label)}</button><div class="c">${r.away.map(evHtml).join("")}</div>`).join("")}
     </div>`;
   }
-  renderTime();renderFmSelects();renderInj();
+  renderTime();renderFmSelects();renderInj();renderInfoBtn();
 }
 /* ---------- period markers and stats in 反映済みの出来事 ----------
    前半終了 shows once the board is in the 2nd half, 90分終了 / 延長終了 once it is in extra time / the shoot-out,
@@ -1583,6 +1584,7 @@ document.addEventListener("keydown",e=>{if(e.key!=="Escape")return;if(!$("pcard"
 function fxInfo(fx){const fi=fx.fixture||{},v=fi.venue||{},lg=fx.league||{};
   return {venue:v.name||null,venueId:v.id??null,city:v.city||null,referee:fi.referee||null,round:lg.round||null,league:lg.name||null,lgId:lg.id||null,country:lg.country||null}}
 const roundJa=r=>{if(!r)return "";let m=/Regular Season - (\d+)/i.exec(r);if(m)return "第"+m[1]+"節";m=/League Stage - (\d+)/i.exec(r);if(m)return "リーグフェーズ 第"+m[1]+"節";
+  m=/Group Stage - (\d+)/i.exec(r);if(m)return "グループステージ 第"+m[1]+"節";m=/^Group ([A-Z0-9]+) - (\d+)$/i.exec(r);if(m)return "グループ"+m[1]+" 第"+m[2]+"節";
   const J={"Final":"決勝","Semi-finals":"準決勝","Quarter-finals":"準々決勝","Round of 16":"ラウンド16","Round of 32":"ラウンド32","Knockout Round Play-offs":"プレーオフ"};return J[r]||r};
 const WX={0:"快晴",1:"晴れ",2:"晴れ時々曇り",3:"曇り",45:"霧",48:"霧",51:"霧雨",53:"霧雨",55:"霧雨",56:"着氷性の霧雨",57:"着氷性の霧雨",61:"小雨",63:"雨",65:"強い雨",66:"着氷性の雨",67:"着氷性の雨",
   71:"小雪",73:"雪",75:"大雪",77:"霧雪",80:"にわか雨",81:"にわか雨",82:"激しいにわか雨",85:"にわか雪",86:"強いにわか雪",95:"雷雨",96:"ひょうを伴う雷雨",99:"ひょうを伴う雷雨"};
@@ -1636,6 +1638,9 @@ async function fetchWeather(){const d=S.data,i=d.info,ko=kickoffOf(d);if(!i||!i.
   }catch(e){MC_MSG="天気: "+(e.message||"取得できませんでした")}
   MC_BUSY="";if(!$("mcard").hidden)renderMinfo()}
 $("infoBtn").onclick=openMinfo;
+/* the button shows the competition and round ("CL リーグフェーズ 第4節", with the logo); known before kickoff, so no spoiler */
+function renderInfoBtn(){const d=S.data,i=d&&d.fixture&&d.info||{},lg=lgName(i.lgId,i.league),b=$("infoBtn");
+  b.innerHTML=lg?`${lgLogo(i.lgId)}${esc(lg)}${i.round?" "+esc(roundJa(i.round)):""}`:"試合情報";b.setAttribute("aria-label","試合情報"+(lg?"("+b.textContent+")":""))}
 $("mcard").addEventListener("click",e=>{if(e.target.id==="mcard"||e.target.closest("#mcClose")){closeMinfo();return}
   if(e.target.closest("#mcFetch")&&!MC_BUSY)fetchFxInfo()});
 /* ---------- injuries / suspensions for this fixture (injuries?fixture=, 1 request) ----------
