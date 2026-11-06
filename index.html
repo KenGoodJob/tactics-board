@@ -361,7 +361,15 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
         <h3 class="sub">読み込んだ試合(通信なしで開けます)</h3>
         <ul class="fxlist" id="fRecent"></ul>
       </div>
-      <h3 class="sub" style="margin-bottom:-10px">日付で探す</h3>
+      <div class="tmbox" id="tmBox">
+        <h3 class="sub">登録チーム</h3>
+        <div class="tmlist" id="tmList"></div>
+        <div id="tmFxBox"><p class="hint" style="margin:4px 0 0">登録チームの試合(保存済みの試合一覧から。前日〜翌日)</p><ul class="fxlist" id="tmFx"></ul></div>
+        <div class="frow"><button class="ghost" id="tmCheck">登録チームの試合を今すぐ確認</button></div>
+        <p class="hint">前日と当日の試合一覧(2回)と、終わった試合1つにつき2回、APIを使います。終わった試合だけを保存し、結果は表示しません。</p>
+        <div class="fmsg" id="tmMsg"></div>
+      </div>
+      <h3 class="sub" style="margin-bottom:-10px;border-top:1px solid var(--line);padding-top:12px">日付で探す</h3>
       <div class="frow">
         <label class="field">日付(日本時間)<input type="date" id="fDate"></label>
         <button class="ghost" id="fPrev" aria-label="前の日">前日</button>
@@ -372,14 +380,6 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       <div class="lgs" id="fLeagues"></div>
       <div class="fmsg" id="fMsg"></div>
       <ul class="fxlist" id="fList"></ul>
-      <div class="tmbox" id="tmBox">
-        <h3 class="sub">登録チーム</h3>
-        <div class="tmlist" id="tmList"></div>
-        <div id="tmFxBox"><p class="hint" style="margin:4px 0 0">登録チームの試合(保存済みの試合一覧から。前日〜翌日)</p><ul class="fxlist" id="tmFx"></ul></div>
-        <div class="frow"><button class="ghost" id="tmCheck">登録チームの試合を今すぐ確認</button></div>
-        <p class="hint">前日と当日の試合一覧(2回)と、終わった試合1つにつき2回、APIを使います。終わった試合だけを保存し、結果は表示しません。</p>
-        <div class="fmsg" id="tmMsg"></div>
-      </div>
       <div class="tmbox" id="nmBox">
         <h3 class="sub">名前の日本語表記</h3>
         <label style="display:flex;align-items:center;gap:8px"><input type="checkbox" id="nmJa"> チーム名・選手名を日本語で表示する</label>
@@ -465,7 +465,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106131539">20261106131539</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106132925">20261106132925</span></p>
 </div>
 
 <script>
