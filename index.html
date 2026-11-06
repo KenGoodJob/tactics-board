@@ -467,7 +467,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106135122">20261106135122</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106135341">20261106135341</span></p>
 </div>
 
 <script>
@@ -1806,7 +1806,10 @@ function recentLg(r){if(r.lgId)return r.lgId;const d=ls.get("tacboard.match."+r.
 function renderRecent(){
   const rec=ls.get("tacboard.recent",[]);$("fRecentBox").hidden=!rec.length;
   const koT=r=>{const c=ls.get("tacboard.match."+r.id,null),k=c&&c.kickoff;return k?new Date(k+9*3600e3).toISOString().slice(11,16):""};   /* kickoff time (JST) from the saved match; older ones have none */
-  $("fRecent").innerHTML=rec.map(r=>{const kt=koT(r);return `<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}${kt?`<span class="kot">${esc(kt)}</span>`:""}</span>
+  /* shown by kickoff (oldest first), 観戦済み gathered at the bottom; the stored order (newest first, used to drop the oldest) is unchanged */
+  const koMs=r=>{const c=ls.get("tacboard.match."+r.id,null);return c&&c.kickoff||(r.date?Date.parse(r.date+"T00:00:00+09:00"):0)||0};
+  const shown=rec.map((r,i)=>({r,i,k:koMs(r)})).sort((a,b)=>(!!a.r.seen-!!b.r.seen)||(a.k-b.k)||(a.i-b.i)).map(x=>x.r);
+  $("fRecent").innerHTML=shown.map(r=>{const kt=koT(r);return `<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}${kt?`<span class="kot">${esc(kt)}</span>`:""}</span>
     <span class="vs"><span class="lg">${lgLogo(recentLg(r))}${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${r.home&&r.away?`${star(r.home)}${logo(r.home.id)}${esc(tName(r.home.id,r.home.name))} vs ${star(r.away)}${logo(r.away.id)}${esc(tName(r.away.id,r.away.name))}`:esc(r.label)}</span>
     <span style="display:flex;gap:6px;align-items:center"><label class="seen"><input type="checkbox" data-seen="${esc(r.id)}"${r.seen?" checked":""}>観戦済み</label><button class="ghost" data-open="${esc(r.id)}">開く</button><button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`}).join("");
 }
