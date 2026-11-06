@@ -136,6 +136,7 @@ details.editor>summary span.safe{color:var(--muted)}
 .fmsg.err{color:var(--danger)}
 .star{border:0;background:none;padding:0 3px 0 0;font-size:16px;line-height:1;color:var(--muted);cursor:pointer}
 .star.on{color:var(--pending)}
+.filebox{display:flex;flex-direction:column;gap:8px}
 .tmbox{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px}
 .tmlist{display:flex;flex-wrap:wrap;gap:6px}
 .tmchip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:999px;padding:3px 4px 3px 12px;font-size:13px;background:var(--surface)}
@@ -387,13 +388,6 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
         <div class="fmsg" id="nmMsg"></div>
         <textarea id="nmText" readonly hidden rows="6" style="width:100%;box-sizing:border-box;font-size:12px;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:6px 8px"></textarea>
       </div>
-      <div class="tmbox">
-        <h3 class="sub">ファイルに書き出す・読み込む</h3>
-        <div class="frow"><button class="ghost" id="fxExport">読み込んだ試合を書き出す</button><button class="ghost" id="fxImport">ファイルから読み込む</button>
-          <input type="file" id="fxFile" accept=".json,application/json" hidden></div>
-        <p class="hint">「ファイル」アプリ(iCloud Drive など)に保存して、別の端末やバックアップに使えます。同じ試合で内容(保存した配置など)が違うときは、「別の内容」として時点つきで追加します。</p>
-        <div class="fmsg" id="fxMsg"></div>
-      </div>
       <div class="frow testrow">
         <span class="hint" style="margin:0">テスト用の試合(架空):</span>
         <select id="testSel" class="field" style="min-width:0;flex:1;border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:6px 8px"></select>
@@ -418,6 +412,15 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       </details>
     </div>
   </details>
+
+  <section class="panel" id="secFile"><h2>ファイルに書き出す・読み込む</h2>
+    <div class="filebox">
+    <div class="frow"><button class="ghost" id="fxExport">書き出す</button><button class="ghost" id="fxImport">ファイルから読み込む</button>
+      <input type="file" id="fxFile" accept=".json,application/json" hidden></div>
+    <p class="hint">読み込んだ試合(保存した配置を含む)・選手情報・試合の検索一覧(前日〜翌日)・登録チームを1つのファイルにします。「ファイル」アプリ(iCloud Drive など)に保存して、別の端末やバックアップに使えます。同じ試合で内容(保存した配置など)が違うときは、「別の内容」として時点つきで追加します。</p>
+    <div class="fmsg" id="fxMsg"></div>
+    </div>
+  </section>
 
   <details class="editor" id="editor">
     <summary>試合データを編集<span>開くと交代や得点が見えます</span></summary>
@@ -457,10 +460,10 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
   <nav class="jump" aria-label="ページ内の移動"><div class="jmenu" id="jumpMenu" hidden>
     <button data-jump="top">スコア</button><button data-jump="secTime">時間</button><button data-jump="secBoard">盤面</button>
     <button data-jump="secPoss">配置</button><button data-jump="secLog">出来事</button><button data-jump="secPlayers">選手一覧</button><button data-jump="secInj">欠場者</button>
-    <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
+    <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106121239">20261106121239</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106121539">20261106121539</span></p>
 </div>
 
 <script>
