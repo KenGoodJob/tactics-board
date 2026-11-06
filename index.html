@@ -453,7 +453,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106093138">20261106093138</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106094328">20261106094328</span></p>
 </div>
 
 <script>
@@ -478,7 +478,7 @@ const TYPE_COLOR={goal:"#1e6a47",og:"#6b5a2e",sub:"#3a5f9e",yellow:"#b8901a",red
 const CARD_WHY={"foul":"反則","argument":"異議","dissent":"異議","time wasting":"遅延行為","delay of game":"遅延行為","handball":"ハンド","unsportsmanlike conduct":"反スポーツ的行為",
   "simulation":"シミュレーション","professional foul":"戦術的な反則","roughing":"乱暴な行為","violent conduct":"暴力行為","serious foul":"著しく不正なプレー","serious foul play":"著しく不正なプレー",
   "holding":"ホールディング","tripping":"トリッピング","pushing":"プッシング","elbowing":"肘打ち","off the ball foul":"ボールのない所での反則","encroachment":"距離不足",
-  "not respecting distance":"距離不足","entering field":"無許可の入場","leaving field":"無許可の退出","excessive celebration":"過度な喜び方","spitting":"つば吐き","biting":"かみつき"};
+  "not respecting distance":"距離不足","entering field":"無許可の入場","leaving field":"無許可の退出","excessive celebration":"過度な喜び方","spitting":"つば吐き","biting":"かみつき","persistent infringement":"繰り返しの反則"};
 const whyJa=w=>{const k=String(w||"").trim();return CARD_WHY[k.toLowerCase()]||k};
 function varJa(d){const s=String(d||"").toLowerCase(),r=/offside/.test(s)?"オフサイド":/hand/.test(s)?"ハンド":/foul/.test(s)?"ファウル":"";
   if(/goal/.test(s)&&/(cancel|disallow)/.test(s))return "ゴール取り消し"+(r?"("+r+")":"");
