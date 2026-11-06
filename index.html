@@ -223,6 +223,7 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .jmenu button:last-child{border-bottom:0}
 .ev .evn{font-size:11px;color:var(--muted);margin-left:2px}
 .ev .pn{text-decoration:underline dotted;text-underline-offset:3px}
+.ev .pn img.face{width:20px;height:20px;vertical-align:-5px;margin-right:3px}
 .pst .cap{display:inline-block;margin-left:4px;padding:0 4px;border-radius:3px;font-size:10px;font-weight:700;line-height:15px;color:#fff;background:var(--accent);vertical-align:1px;text-decoration:none}
 .pst td.pn{text-decoration:underline dotted;text-underline-offset:3px}
 .pcard{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
@@ -453,7 +454,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106094328">20261106094328</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106112356">20261106112356</span></p>
 </div>
 
 <script>
@@ -765,7 +766,7 @@ function render(){
   // log: one row per moment, home left / away right
   if(!st.log.length&&!markers(st).length){$("log").innerHTML=`<p class="empty">まだ反映された出来事はありません。</p>`}
   else{
-    const n=id=>pm[id]?`<span class="pn" data-pinfo="${esc(id)}">${esc(pShort(pm[id]))}</span>`:"?";
+    const n=id=>pm[id]?`<span class="pn" data-pinfo="${esc(id)}">${faceImg(pm[id])}${esc(pShort(pm[id]))}</span>`:"?";
     const evHtml=e=>{const cards=e.type==="yellow"?CARD_Y:e.type==="red"?(st.y2.has(e.id)?CARD_Y+CARD_Y:CARD_R):"";const nt=evNote(e),txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="var"?`${esc(nt)}${e.player?" "+n(e.player):""}`:(e.type==="goal"&&e.assist?`${n(e.player)}(A ${n(e.assist)})`:n(e.player))+(nt?`<small class="evn">(${esc(nt)})</small>`:"");
       return `<div class="ev"><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span><span>${cards}${txt}</span></div>`};
     /* shoot-out: one row per round (n-th kick of each side) */
