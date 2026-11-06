@@ -217,6 +217,7 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .injg .plist li{grid-template-columns:1fr auto}
 .tag.q{background:#fff3d6;color:#7a5200;border-color:#e6c36e}
 .tag.mf{background:#fde3df;color:#8a2a1e;border-color:#e7a79c}
+.injg .tag{display:inline-block;min-width:4em;text-align:center}   /* 欠場 / 出場微妙 share one width so photos and names line up */
 .mcrow img.face{width:36px;height:36px;margin:0;vertical-align:middle}
 .wx{font-size:14px}
 .jump{position:fixed;right:max(12px,env(safe-area-inset-right,0px));bottom:max(14px,env(safe-area-inset-bottom,0px));z-index:40;display:flex;flex-direction:column;align-items:flex-end;gap:6px}
@@ -459,7 +460,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106114312">20261106114312</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106114707">20261106114707</span></p>
 </div>
 
 <script>
