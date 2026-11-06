@@ -78,7 +78,7 @@
 
 ### データの保持
 - 配置・時間・試合データは **sessionStorage のみ**(再読み込みでは残る、閉じたら消える)
-- localStorage に残すのは、APIキー・リーグの絞り込み・読み込み済み試合のキャッシュ(リクエスト節約のため)と、試合ごとの「保存した配置」、日本語名の対応表のキャッシュ(`tacboard.names`)・日本語表示の切り替え(`tacboard.ja`)・未登録チームのメモ(`tacboard.nameAsk`、最大300件)・盤面マークと顔写真の表示切り替え(`tacboard.marks`・`tacboard.faces`)、選手情報(`tacboard.pinfo.*`・`tacboard.pinfoIdx`・`tacboard.pinfoMax`)、読み込み方(`tacboard.loadMode`)、最後の検索結果(`tacboard.lastFx`)、日本代表だけの表示(`tacboard.japan`)だけ
+- localStorage に残すのは、APIキー・リーグの絞り込み・読み込み済み試合のキャッシュ(リクエスト節約のため)と、試合ごとの「保存した配置」、日本語名の対応表のキャッシュ(`tacboard.names`)・日本語表示の切り替え(`tacboard.ja`)・未登録チームのメモ(`tacboard.nameAsk`、最大300件)・盤面マークと顔写真の表示切り替え(`tacboard.marks`・`tacboard.faces`)、選手情報(`tacboard.pinfo.*`・`tacboard.pinfoIdx`・`tacboard.pinfoMax`)、読み込み方(`tacboard.loadMode`)、日付ごとの検索結果(`tacboard.fxDays`)、日本代表だけの表示(`tacboard.japan`)だけ
   - 「保存した配置」= `tacboard.shape.<試合キー>` に、チーム×パターンごとのシステム(fm)・保存位置(pos)と「左右を反転」の状態を保存。試合キーは API の試合なら `fx<fixture id>`、それ以外はホーム名|アウェイ名
   - 保存していないドラッグ位置・時間・反映済みの出来事は残さない(開き直してもネタバレしないため)
   - 端末ごとの保存なので、iPad と iPhone では共有されない
@@ -86,10 +86,11 @@
 - 起動時(sessionStorage が空のとき)は、最後に開いた保存済みの試合(`tacboard.last` に一覧の id)をキックオフの状態で開く。保存されていない試合(試合中に読み込んだもの・サンプル・JSON貼り付け)を開いたあとや、その試合を一覧から消したあとはサンプル試合
 - 「読み込んだ試合」は「試合を探して読み込む」の先頭(その下に「日付で探す」)。日付の下に小さくキックオフ時刻(日本時間、保存した試合の `kickoff` から。無い古い試合は日付だけ)(2026-11-06 にユーザーの依頼で変更)
 - 「読み込んだ試合」一覧 `tacboard.recent`(最大40件、あふれた分は試合データと配置も消す)。「消す」は2回タップ(1回目で赤い「もう一度タップで消す」に変わり、3秒以内にもう一度で消す)。各項目に `at`(取得・配置保存の時刻)を持ち「MM/DD HH:MM 時点」と表示
-- ファイルの書き出し・読み込み: 一覧の試合を `{app:"tactics-board",kind:"matches",version:1,exportedAt,items:[{id,date,label,lg,at,copy,data,shape}],pinfo:{<チームID>:[スナップショット]},pinfoMax}` で1ファイルに。iPad では共有シート(「ファイル」に保存)、使えなければダウンロード
+- ファイルの書き出し・読み込み: 一覧の試合を `{app:"tactics-board",kind:"matches",version:1,exportedAt,items:[{id,date,label,lg,at,copy,data,shape}],pinfo:{<チームID>:[スナップショット]},pinfoMax,fxDays:{<日付>:{at,list}},teams:[{id,name}]}` で1ファイルに。iPad では共有シート(「ファイル」に保存)、使えなければダウンロード
   - 読み込み時、同じ試合で内容(試合データ+保存した配置、時刻は除く。比較では stats・inj・info・ユニフォームの色・出来事の id と補足(pen・why・note、var・pen_miss の出来事)等を除く)が同じなら省略、違えば「別の内容」として追加(id は `<fixture>~<YYYYMMDDHHmm>`、data.copy にも同じ値。配置のキーも別になる)
   - 追加するときは試合データを**そのまま全部**保存する(欠場者・スタッツ・試合情報・監督・キックオフ・シーズン。2026-11-04 以前は比較用に削った版を保存していて欠場者等が消えていた)
   - 「同じ内容のため省略」の試合でも、端末側に無い欠場者(取得時刻が新しい方)・スタッツ・試合情報・監督・キックオフ・シーズン・ユニフォームの色、出来事の補足(読み込む側の方が多ければ出来事ごと置き換え)は補う(「うち欠場者・スタッツ等を補った N 件」)
+  - 検索結果 `fxDays`(2026-11-06 追加): 読み込む時点で前日〜翌日の範囲にある日付だけ取り込み、端末に同じ日付があれば `at` の新しい方。登録チーム `teams` は端末に無いチームだけ追加(消しはしない)
   - 選手情報 `pinfo` はチームごとに端末の分と合わせ、シーズンごとに新しい方(古い方の個別取得 solo は引き継ぐ)、新しい順に最大3件。pinfoMax は端末に無いときだけ入れる
 
 ### 試合データ(API-Football)
@@ -98,7 +99,7 @@
 - 使用回数: 応答ヘッダー `x-ratelimit-requests-limit/remaining` と `status` エンドポイントの `requests.current/limit_day` から「本日のAPI使用: N / 100 回」を「APIキーの設定」の見出しの横に表示(2026-11-06 にユーザーの依頼で移動。`tacboard.usage` に UTC の日付つきで保存)
 - APIキーは画面で入力し、その端末の localStorage にだけ保存する。**リポジトリには絶対に入れない**
 - 検索: `fixtures?date=YYYY-MM-DD&timezone=Asia/Tokyo` を1回。一覧にはキックオフ時刻・リーグ・対戦カードだけを出す(スコアや status は表示もキャッシュもしない)
-- 最後の検索結果(2026-11-06 にユーザーの依頼で追加): 検索のたびに `tacboard.lastFx={date,at,list}`(slimFx で削った一覧、スコア・status なし)に上書き保存し、起動時に復元して表示する(「MM/DD HH:MM 時点の一覧。最新にするには「検索」」)。日付が選べる範囲内なら日付欄もその日にする。終了済みかどうか(done)は検索時点の値なので、まとめて取得では `fixtures?id=` の応答の status で上書きする(個別取得では検索時点のまま。終わる前の一覧から読み込むと保存されない)
+- 検索結果の保存(2026-11-06 にユーザーの依頼で追加・変更): 検索のたびにその日付の一覧を `tacboard.fxDays={last,days:{<日付>:{at,list}}}`(slimFx で削った一覧、スコア・status なし)に保存。**無料プランで取れる範囲(前日・当日・翌日)の日付だけ**を残し、範囲外は読み書きのたびに消す。起動時は最後に見た日付(`last`)の一覧を復元(「MM/DD HH:MM 時点の一覧。最新にするには「検索」」)。日付欄の変更・前日/翌日は保存済みの一覧があればそれを出す(API なし)。無ければ前日/翌日は従来どおり検索し、日付欄の変更は「検索」を促す。「検索」は常に取り直す。旧形式 `tacboard.lastFx` は最初に読み込んで消す。終了済みかどうか(done)は検索時点の値なので、まとめて取得では `fixtures?id=` の応答の status で一覧と保存分の両方を上書きする(個別取得では検索時点のまま。終わる前の一覧から読み込むと保存されない)
 - 読み込み方は「APIキーの設定」内のラジオボタンで選ぶ(`tacboard.loadMode`、2026-11-05 にユーザーと決定)
   - **まとめて取得(初期値、"one")**: `fixtures?id=` 1回でスタメン・出来事(応答のスコア等は使わない)、スタメン発表後なら続けて `injuries?fixture=` 1回。終了済みの試合は応答の statistics・players から試合全体のチームスタッツと選手スタッツも `data.stats` に入れる(表示は従来どおりスタッツを広げたときだけ)。前半の数字が応答に無ければ `stats.noH1=true` とし、前半終了の行を広げたときだけ `fixtures/statistics?half=true` を1回取る。応答に lineups・events が無いときは自動で個別取得に切り替える
   - **個別に取得("split")**: `fixtures/lineups`(スタメン未発表ならここまで)、`fixtures/events` と `injuries?fixture=` を並行で

@@ -460,7 +460,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106115514">20261106115514</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106120725">20261106120725</span></p>
 </div>
 
 <script>
@@ -1381,7 +1381,7 @@ async function search(){
     if(!list){list=await api(`fixtures?date=${date}&timezone=Asia/Tokyo`);
       if(date<shiftDate(todayJST(),-1))ls.set("tacboard.fx."+date,list.map(slimFx))}
     lastFx=list;renderFixtures(list);fmsg("fMsg",`${date} の試合 ${quotaText()}`);
-    ls.set("tacboard.lastFx",{date,at:Date.now(),list:list.map(f=>f.done!=null?f:slimFx(f))});
+    putFxDay(date,Date.now(),list);
   }catch(e){fmsg("fMsg",e.message,true)}
 }
 /* keep only what the board needs; scores and status are dropped before caching */
@@ -1390,15 +1390,28 @@ const slimFx=f=>({fixture:{id:f.fixture.id,date:f.fixture.date,timestamp:f.fixtu
   done:["FT","AET","PEN"].includes(f.fixture.status&&f.fixture.status.short)});
 $("fSearch").onclick=search;
 /* the last search is kept (slimmed: no score or status) so the list is there again after the app restarts */
-function restoreFx(){const s=ls.get("tacboard.lastFx",null);if(!s||!Array.isArray(s.list))return;
-  lastFx=s.list;const d=$("fDate");if(s.date>=d.min&&s.date<=d.max){d.value=s.date;dateRange()}
-  renderFixtures(lastFx);fmsg("fMsg",`${s.date} の試合(${fmtAt(s.at)} 時点の一覧。最新にするには「検索」)`)}
+/* lists are kept per date, only for the dates the free plan serves (yesterday..tomorrow); older dates are dropped */
+const fxRange=()=>{const t=todayJST();return [shiftDate(t,-1),shiftDate(t,1)]};
+const slimKeep=f=>{const x=slimFx(f);if(f.done!=null)x.done=f.done;return x};   /* never keeps scores, keeps a known finished flag */
+function fxDays(){const [lo,hi]=fxRange();let o=ls.get("tacboard.fxDays",null);
+  if(!o||!o.days){o={last:null,days:{}};const s=ls.get("tacboard.lastFx",null);   /* the older single-day save */
+    if(s&&s.date&&Array.isArray(s.list)){o.days[s.date]={at:s.at,list:s.list};o.last=s.date}ls.del("tacboard.lastFx")}
+  Object.keys(o.days).forEach(d=>{if(d<lo||d>hi)delete o.days[d]});if(o.last&&!o.days[o.last])o.last=null;return o}
+function putFxDay(date,at,list){const o=fxDays();o.days[date]={at,list:list.map(slimKeep)};o.last=date;ls.set("tacboard.fxDays",o)}
+function fxDone(fid,done){const o=fxDays();let ch=false;Object.values(o.days).forEach(v=>v.list.forEach(f=>{if(f.fixture.id===fid&&f.done!==done){f.done=done;ch=true}}));if(ch)ls.set("tacboard.fxDays",o)}
+function showFxDay(date){const o=fxDays(),v=o.days[date];if(!v)return false;o.last=date;ls.set("tacboard.fxDays",o);
+  lastFx=v.list;renderFixtures(lastFx);fmsg("fMsg",`${date} の試合(${fmtAt(v.at)} 時点の一覧。最新にするには「検索」)`);return true}
+function restoreFx(){const o=fxDays();ls.set("tacboard.fxDays",o);const d=$("fDate"),t=o.last||(o.days[todayJST()]?todayJST():Object.keys(o.days).sort().pop());
+  if(!t)return;d.value=t;dateRange();showFxDay(d.value)}
+/* switching dates shows the saved list (no API); without one, 前日/翌日 search as before and the date field asks for 検索 */
+function gotoDay(auto){dateRange();if(showFxDay($("fDate").value))return;
+  if(auto){search();return}lastFx=null;$("fList").innerHTML="";fmsg("fMsg","この日の一覧はまだありません。「検索」で取得します")}
 /* the free plan only serves yesterday, today and tomorrow */
 function dateRange(){const t=todayJST(),lo=shiftDate(t,-1),hi=shiftDate(t,1),d=$("fDate");d.min=lo;d.max=hi;
   if(!d.value||d.value<lo||d.value>hi)d.value=t;$("fPrev").disabled=d.value<=lo;$("fNext").disabled=d.value>=hi}
-$("fDate").onchange=dateRange;
-$("fPrev").onclick=()=>{$("fDate").value=shiftDate($("fDate").value||todayJST(),-1);dateRange();search()};
-$("fNext").onclick=()=>{$("fDate").value=shiftDate($("fDate").value||todayJST(),1);dateRange();search()};
+$("fDate").onchange=()=>gotoDay(false);
+$("fPrev").onclick=()=>{$("fDate").value=shiftDate($("fDate").value||todayJST(),-1);gotoDay(true)};
+$("fNext").onclick=()=>{$("fDate").value=shiftDate($("fDate").value||todayJST(),1);gotoDay(true)};
 
 /* convert API lineups + events into the board's data */
 function hex(c){return c&&/^[0-9a-f]{6}$/i.test(c)?"#"+c:null}
@@ -1735,7 +1748,7 @@ document.querySelectorAll('input[name="loadMode"]').forEach(r=>{r.checked=r.valu
   r.onchange=()=>{try{localStorage.setItem("tacboard.loadMode",r.value)}catch(e){}}});
 async function fetchMatchOne(f){
   const fid=f.fixture.id,res=await api("fixtures?id="+fid),x=res&&res[0];
-  if(x&&x.fixture&&x.fixture.status)f.done=["FT","AET","PEN"].includes(x.fixture.status.short);
+  if(x&&x.fixture&&x.fixture.status){f.done=["FT","AET","PEN"].includes(x.fixture.status.short);fxDone(fid,f.done)}
   if(!x||!Array.isArray(x.lineups)||!Array.isArray(x.events))return undefined;   /* the reply lacks them: fall back to the older way */
   if(!x.lineups.length)return null;
   const inj=await api("injuries?fixture="+fid).catch(()=>null);
@@ -1830,15 +1843,17 @@ $("fxExport").onclick=async()=>{
   const rec=ls.get("tacboard.recent",[]);
   const items=rec.map(r=>{const data=ls.get("tacboard.match."+r.id,null);if(!data)return null;const shape=ls.get(matchKey(data),null);
     return {id:String(r.id),date:r.date,label:r.label,lg:r.lg,lgId:recentLg(r),home:r.home||null,away:r.away||null,at:Math.max(r.at||0,shape&&shape.at||0)||null,copy:r.copy||null,data,shape}}).filter(Boolean);
-  if(!items.length){fmsg("fxMsg","書き出す試合がありません",true);return}
+  const fxd=fxDays().days,teams=myTeams(),nd=Object.keys(fxd).length;
+  if(!items.length&&!nd&&!teams.length){fmsg("fxMsg","書き出す試合がありません",true);return}
   const now=Date.now(),stamp=new Date(now+9*3600e3).toISOString().slice(0,16).replace(/[-:]/g,"").replace("T","-");
   const pinfo={};Object.keys(ls.get("tacboard.pinfoIdx",{})).forEach(tid=>{const l=piSnaps(tid);if(l.length)pinfo[tid]=l});
-  const name=`tactics-board-${stamp}.json`,text=JSON.stringify({app:"tactics-board",kind:"matches",version:1,exportedAt:now,items,pinfo,pinfoMax:piMax()});
+  const name=`tactics-board-${stamp}.json`,text=JSON.stringify({app:"tactics-board",kind:"matches",version:1,exportedAt:now,items,pinfo,pinfoMax:piMax(),fxDays:fxd,teams});
+  const ext=`${nd?`・試合一覧 ${nd} 日分`:""}${teams.length?`・登録チーム ${teams.length}`:""}`;
   const file=new File([text],name,{type:"application/json"});
-  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});fmsg("fxMsg",`${items.length} 試合${pc(pinfo)}を書き出しました`);return}}
+  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:name});fmsg("fxMsg",`${items.length} 試合${pc(pinfo)}${ext}を書き出しました`);return}}
   catch(e){if(e&&e.name==="AbortError"){fmsg("fxMsg","書き出しを取り消しました");return}}
   const a=document.createElement("a");a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();
-  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);fmsg("fxMsg",`${items.length} 試合${pc(pinfo)}を書き出しました(ダウンロード)`);
+  setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);fmsg("fxMsg",`${items.length} 試合${pc(pinfo)}${ext}を書き出しました(ダウンロード)`);
 };
 $("fxImport").onclick=()=>$("fxFile").click();
 $("fxFile").onchange=async e=>{
@@ -1865,10 +1880,18 @@ $("fxFile").onchange=async e=>{
   });
   if(j.pinfoMax&&!piMax())ls.set("tacboard.pinfoMax",j.pinfoMax);
   const pn=mergePinfo(j.pinfo);
+  /* search lists: only dates still in range, the newer list wins; registered teams: added to this device's */
+  let fd=0,ft=0;
+  if(j.fxDays&&typeof j.fxDays==="object"){const [lo,hi]=fxRange(),o=fxDays();
+    Object.entries(j.fxDays).forEach(([d,v])=>{if(d<lo||d>hi||!v||!Array.isArray(v.list))return;if(o.days[d]&&(o.days[d].at||0)>=(v.at||0))return;
+      o.days[d]={at:v.at||j.exportedAt||Date.now(),list:v.list.map(slimKeep)};fd++});
+    if(fd){ls.set("tacboard.fxDays",o);gotoDay(false)}}
+  if(Array.isArray(j.teams)){const t=myTeams();j.teams.forEach(x=>{if(x&&x.id&&!t.some(y=>y.id===x.id)){t.push({id:x.id,name:x.name||""});ft++}});
+    if(ft){ls.set("tacboard.teams",t);renderTeams();if(lastFx)renderFixtures(lastFx);promptCheck()}}
   /* the open match may be one of the updated ones: reload its extras into the session */
   const oid=entryId(S.data),od=oid&&ls.get("tacboard.match."+oid,null);if(od&&fillExtras(S.data,od)){save();render()}
   renderRecent();
-  fmsg("fxMsg",`読み込みました: 追加 ${added} 件 / 別の内容として追加 ${copies} 件 / 同じ内容のため省略 ${same} 件${filled?`(うち欠場者・スタッツ等を補った ${filled} 件)`:""}${pn?` / 選手情報 ${pn} チーム`:""}`);
+  fmsg("fxMsg",`読み込みました: 追加 ${added} 件 / 別の内容として追加 ${copies} 件 / 同じ内容のため省略 ${same} 件${filled?`(うち欠場者・スタッツ等を補った ${filled} 件)`:""}${pn?` / 選手情報 ${pn} チーム`:""}${fd?` / 試合一覧 ${fd} 日分`:""}${ft?` / 登録チーム ${ft} 件`:""}`);
 };
 
 /* ---------- registered teams: confirm, then fetch their finished matches of yesterday and today ---------- */
