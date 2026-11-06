@@ -223,7 +223,8 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .jmenu button:last-child{border-bottom:0}
 .ev .evn{font-size:11px;color:var(--muted);margin-left:2px}
 .ev .pn{text-decoration:underline dotted;text-underline-offset:3px}
-.ev .pn img.face{width:20px;height:20px;vertical-align:-5px;margin-right:3px}
+.ev .pn img.face,.pst td img.face{width:20px;height:20px;vertical-align:-5px;margin-right:3px}
+.fxlist .kot{display:block;font-size:11px;font-weight:500;color:var(--muted)}
 .pst .cap{display:inline-block;margin-left:4px;padding:0 4px;border-radius:3px;font-size:10px;font-weight:700;line-height:15px;color:#fff;background:var(--accent);vertical-align:1px;text-decoration:none}
 .pst td.pn{text-decoration:underline dotted;text-underline-offset:3px}
 .pcard{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px}
@@ -349,6 +350,11 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
   <details class="editor finder" id="finder">
     <summary>試合を探して読み込む<span class="safe">スコアや結果は表示しません</span></summary>
     <div class="ed">
+      <div id="fRecentBox">
+        <h3 class="sub">読み込んだ試合(通信なしで開けます)</h3>
+        <ul class="fxlist" id="fRecent"></ul>
+      </div>
+      <h3 class="sub" style="margin-bottom:-10px">日付で探す</h3>
       <div class="frow">
         <label class="field">日付(日本時間)<input type="date" id="fDate"></label>
         <button class="ghost" id="fPrev" aria-label="前の日">前日</button>
@@ -360,10 +366,6 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       <div class="fmsg" id="fMsg"></div>
       <div class="hint" id="fQuota"></div>
       <ul class="fxlist" id="fList"></ul>
-      <div id="fRecentBox">
-        <h3 class="sub">読み込んだ試合(通信なしで開けます)</h3>
-        <ul class="fxlist" id="fRecent"></ul>
-      </div>
       <div class="tmbox" id="tmBox">
         <h3 class="sub">登録チーム</h3>
         <div class="tmlist" id="tmList"></div>
@@ -454,7 +456,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106112356">20261106112356</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106113300">20261106113300</span></p>
 </div>
 
 <script>
@@ -830,7 +832,7 @@ function playerStatsHtml(ps){if(!ps)return "";const T=S.data.teams,list=(ps[PS_T
   const nm=r=>{const p=pm[r.pid];return p?(p.num!==""?p.num+" ":"")+pName(p):r.name};
   return `<div class="pstab">${["home","away"].map(t=>`<button class="ghost${PS_TEAM===t?" on":""}" data-psteam="${t}">${logo(T[t].apiId)}${esc(tName(T[t].apiId,T[t].name))}</button>`).join("")}</div>
     <div class="pswrap"><table class="pst"><thead><tr><th>選手</th>${PS_COLS.map(([k,l])=>`<th><button data-pssort="${k}" class="${PS_SORT===k?"on":""}">${l}</button></th>`).join("")}</tr></thead>
-    <tbody>${list.map(r=>`<tr><td${r.pid&&pm[r.pid]?` class="pn" data-pinfo="${esc(r.pid)}"`:""}>${esc(nm(r))}${r.cap?`<span class="cap" title="キャプテン">C</span>`:""}</td>${PS_COLS.map(([k])=>`<td>${r[k]==null||r[k]===""?"–":esc(r[k])}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${PS_COLS.length+1}">データがありません</td></tr>`}</tbody></table></div>`}
+    <tbody>${list.map(r=>`<tr><td${r.pid&&pm[r.pid]?` class="pn" data-pinfo="${esc(r.pid)}"`:""}>${pm[r.pid]?faceImg(pm[r.pid]):""}${esc(nm(r))}${r.cap?`<span class="cap" title="キャプテン">C</span>`:""}</td>${PS_COLS.map(([k])=>`<td>${r[k]==null||r[k]===""?"–":esc(r[k])}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${PS_COLS.length+1}">データがありません</td></tr>`}</tbody></table></div>`}
 function statsPanel(kind){const st=S.data.stats||{};let h="";
   if(STATS_BUSY===kind)return `<p class="empty">取得しています…</p>`;
   if(kind==="ht"){
@@ -1770,9 +1772,10 @@ $("fList").addEventListener("click",e=>{
 function recentLg(r){if(r.lgId)return r.lgId;const d=ls.get("tacboard.match."+r.id,null);return d&&d.info&&d.info.lgId||null}
 function renderRecent(){
   const rec=ls.get("tacboard.recent",[]);$("fRecentBox").hidden=!rec.length;
-  $("fRecent").innerHTML=rec.map(r=>`<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}</span>
+  const koT=r=>{const c=ls.get("tacboard.match."+r.id,null),k=c&&c.kickoff;return k?new Date(k+9*3600e3).toISOString().slice(11,16):""};   /* kickoff time (JST) from the saved match; older ones have none */
+  $("fRecent").innerHTML=rec.map(r=>{const kt=koT(r);return `<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}${kt?`<span class="kot">${esc(kt)}</span>`:""}</span>
     <span class="vs"><span class="lg">${lgLogo(recentLg(r))}${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${r.home&&r.away?`${star(r.home)}${logo(r.home.id)}${esc(tName(r.home.id,r.home.name))} vs ${star(r.away)}${logo(r.away.id)}${esc(tName(r.away.id,r.away.name))}`:esc(r.label)}</span>
-    <span style="display:flex;gap:6px"><button class="ghost" data-open="${esc(r.id)}">開く</button><button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`).join("");
+    <span style="display:flex;gap:6px"><button class="ghost" data-open="${esc(r.id)}">開く</button><button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`}).join("");
 }
 $("fRecent").addEventListener("click",e=>{
   const st=e.target.closest("[data-star]");if(st){toggleTeam(+st.dataset.star,st.dataset.name);return}
