@@ -460,7 +460,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106114707">20261106114707</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106115225">20261106115225</span></p>
 </div>
 
 <script>
@@ -1342,7 +1342,7 @@ function renderLeagues(){
   const sel=ls.get("tacboard.leagues",LG_DEF),all=ls.get("tacboard.allLeagues",false);
   $("fLeagues").innerHTML=LG_GROUPS.map(([g,ls_],gi)=>{const on=ls_.filter(l=>sel.includes(l[0])).length;
       return `<button type="button" class="lgh" data-lgg="${gi}" aria-label="${g}を${on<ls_.length?"すべてオン":"すべてオフ"}">${g}<span>${on}/${ls_.length}</span><em>${on<ls_.length?"すべてオン":"すべてオフ"}</em></button>`+ls_.map(([id,n])=>`<label><input type="checkbox" data-lg="${id}" ${sel.includes(id)?"checked":""}>${lgLogo(id)}${n}</label>`).join("")}).join("")
-    +`<div class="lgh">その他</div><label><input type="checkbox" id="fAll" ${all?"checked":""}>その他のリーグも表示</label>`
+    +`<div class="lgh">その他</div><label><input type="checkbox" id="fAll" ${all?"checked":""}><span class="flag" aria-hidden="true">🌐</span>その他のリーグも表示</label>`
     +`<label><input type="checkbox" id="fJpn" ${ls.get("tacboard.japan",false)?"checked":""}><span class="flag" aria-hidden="true">🇯🇵</span>日本代表の試合だけ表示</label>`;
 }
 function saveLeagues(){ls.set("tacboard.leagues",[...document.querySelectorAll("[data-lg]:checked")].map(x=>+x.dataset.lg));
