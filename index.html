@@ -464,7 +464,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261106122712">20261106122712</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261106123514">20261106123514</span></p>
 </div>
 
 <script>
@@ -1347,7 +1347,7 @@ function renderLeagues(){
   $("fLeagues").innerHTML=LG_GROUPS.map(([g,ls_],gi)=>{const on=ls_.filter(l=>sel.includes(l[0])).length;
       return `<button type="button" class="lgh" data-lgg="${gi}" aria-label="${g}を${on<ls_.length?"すべてオン":"すべてオフ"}">${g}<span>${on}/${ls_.length}</span><em>${on<ls_.length?"すべてオン":"すべてオフ"}</em></button>`+ls_.map(([id,n])=>`<label><input type="checkbox" data-lg="${id}" ${sel.includes(id)?"checked":""}>${lgLogo(id)}${n}</label>`).join("")}).join("")
     +`<div class="lgh">その他</div><label><input type="checkbox" id="fAll" ${all?"checked":""}><span class="flag" aria-hidden="true">🌐</span>その他のリーグも表示</label>`
-    +`<label><input type="checkbox" id="fJpn" ${ls.get("tacboard.japan",false)?"checked":""}><span class="flag" aria-hidden="true">🇯🇵</span>日本代表の試合だけ表示</label>`;
+    +`<label><input type="checkbox" id="fJpn" ${ls.get("tacboard.japan",false)?"checked":""}><span class="flag" aria-hidden="true">🇯🇵</span>日本代表の試合も表示</label>`;
 }
 function saveLeagues(){ls.set("tacboard.leagues",[...document.querySelectorAll("[data-lg]:checked")].map(x=>+x.dataset.lg));
   ls.set("tacboard.allLeagues",$("fAll").checked);ls.set("tacboard.japan",$("fJpn").checked);renderLeagues();if(lastFx)renderFixtures(lastFx)}
@@ -1371,12 +1371,12 @@ const isJapan=f=>[f.teams.home,f.teams.away].some(t=>fold(t.name)==="japan");
 function renderFixtures(list){
   const sel=ls.get("tacboard.leagues",LG_DEF),all=ls.get("tacboard.allLeagues",false);
   const jp=ls.get("tacboard.japan",false),kw=$("fKw").value.trim();
-  const rows=list.filter(f=>kw?kwHit(f,kw):jp?isJapan(f):all||sel.includes(f.league.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
+  const rows=list.filter(f=>kw?kwHit(f,kw):all||sel.includes(f.league.id)||jp&&isJapan(f))   /* checks combine with OR; a keyword overrides them */.sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp);
   noteTeams(rows.flatMap(f=>{const lg=lgName(f.league.id,f.league.name);return [[f.teams.home,lg],[f.teams.away,lg]]}));
   $("fList").innerHTML=rows.length?rows.map(f=>`<li><span class="ko">${esc(f.fixture.date.slice(11,16))}</span>
       <span class="vs"><span class="lg">${lgLogo(f.league.id)}${esc(lgName(f.league.id,f.league.name))}</span>${star(f.teams.home)}${logo(f.teams.home.id)}${esc(tName(f.teams.home.id,f.teams.home.name))} vs ${star(f.teams.away)}${logo(f.teams.away.id)}${esc(tName(f.teams.away.id,f.teams.away.name))}</span>
       <button class="ghost" data-fx="${f.fixture.id}">読み込む</button></li>`).join("")
-    :`<li style="display:block" class="empty">${kw?`「${esc(kw)}」に合う試合はありません。別の書き方(英語名など)や日付を試してください。`:jp?"この日の日本代表の試合はありません。日付を変えてみてください。":"該当する試合はありません。リーグの選択や日付を変えてみてください。"}</li>`;
+    :`<li style="display:block" class="empty">${kw?`「${esc(kw)}」に合う試合はありません。別の書き方(英語名など)や日付を試してください。`:"該当する試合はありません。リーグの選択や日付を変えてみてください。"}</li>`;
 }
 async function search(){
   const date=$("fDate").value||todayJST();fmsg("fMsg","検索しています…");$("fList").innerHTML="";
