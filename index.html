@@ -489,7 +489,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261108133502">20261108133502</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261108231926">20261108231926</span></p>
 </div>
 
 <script>
@@ -766,7 +766,7 @@ function render(){
   $("pkScore").hidden=!st.pkUsed;$("pkScore").textContent="PK "+st.pk.home+" – "+st.pk.away;
   const ap=norm(S.applied);$("appliedClock").textContent=(ap.seg==="1H"&&ap.min===0)?"キックオフ":ap.seg==="FT"?tLabel(ap):ap.seg==="PK"?"PK戦"+(ap.add?" "+tLabel(ap):""):tSeg(ap)+" "+tLabel(ap);
   // board: pitch players, then the bench strip under the pitch (subs nearest the halfway line, players who left after them, faded)
-  let g="";const showM=marksOn(),showF=facesOn(),opt={showM,showF,marks:st.marks,rt:ratingMap()};
+  let g="";const showM=marksOn(),showF=facesOn(),opt={showM,showF,marks:st.marks,rt:ratingMap(),nat:natMap()};
   ["home","away"].forEach(t=>{
     st.slots[t].forEach((pid,s)=>{
       if(!pid)return;const p=pm[pid];if(!p)return;
@@ -940,10 +940,12 @@ function benchBottom(rows){return BENCH_Y0+(rows-1)*BENCH_DY+6.5}
 /* player ratings (from the full-match player stats) shown only while 試合終了 → スタッツ is open */
 function ratingMap(){const ps=S.data.stats&&S.data.stats.players;if(!ps||!STATS_OPEN.ft||norm(S.applied).seg!=="FT")return null;
   const m={};["home","away"].forEach(t=>(ps[t]||[]).forEach(x=>{const v=parseFloat(x.rt);if(x.pid&&v>0)m[x.pid]=v}));return m}
+/* nationality flag: small, outside the circle at the lower left, above the name (pitch only; the bench strip is too tight) */
+function flagSvg(f){return f?`<text x="-3.2" y="3.05" text-anchor="middle" font-size="1.35" pointer-events="none">${f}</text>`:""}
 function ratingSvg(v){if(!v)return "";const c=v>=8?"#1f8a52":v>=7?"#3d7fbf":v>=6?"#7a7f86":"#c0503a";
   return `<g pointer-events="none"><rect x="-4.6" y="-4.3" width="3.6" height="2.2" rx=".5" fill="${c}" stroke="rgba(0,0,0,.4)" stroke-width=".15"/>
     <text x="-2.8" y="-2.65" text-anchor="middle" font-size="1.55" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="#fff">${v.toFixed(1)}</text></g>`}
-function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier,rt}){
+function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier,rt,nat}){
   const T=S.data.teams[t],col=T.color,fu=showF&&faceUrl(p),face=!!fu&&!FACE_BAD.has(fu),bg=gk?(T.gkColor||"#e9e4d6"):col,sh=pShort(p),m=marks[p.id];
   const fg=numOn(bg,gk?T.gkNum:T.numColor);
   const sc=bench?BENCH_SC:1,ly=bench?(tier?7.1:4.7):4.9;
@@ -955,6 +957,7 @@ function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier,rt}){
     ${face?`<image class="face" href="${esc(fu)}" x="-2.3" y="-2.3" width="4.6" height="4.6" clip-path="url(#fc)" preserveAspectRatio="xMidYMin slice" pointer-events="none"/><circle class="facering" r="2.4" fill="none" stroke="${gk?bg:col}" stroke-width=".55"/>`:""}
     ${markSvg(m,showM)}
     ${rt?ratingSvg(rt[p.id]):""}
+    ${!bench&&nat&&p.apiId!=null?flagSvg(natFlag(nat[p.apiId])):""}
     <text class="pname" data-plain="${esc(sh)}" y="${ly}" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(face&&p.num!==""?p.num+" "+sh:sh)}</text>
   </g>`}
 /* kit number colour when it stands out from the shirt colour, else black / white */
@@ -1530,6 +1533,14 @@ const NAT_JA={England:"イングランド",Scotland:"スコットランド",Wale
   Mali:"マリ","Burkina Faso":"ブルキナファソ",Guinea:"ギニア","Congo DR":"コンゴ民主共和国",Congo:"コンゴ",Gabon:"ガボン","Cape Verde Islands":"カーボベルデ","Cape Verde":"カーボベルデ",Angola:"アンゴラ",
   "South Africa":"南アフリカ",Zambia:"ザンビア",Gambia:"ガンビア","Guinea-Bissau":"ギニアビサウ",Benin:"ベナン",Togo:"トーゴ",Japan:"日本","Korea Republic":"韓国","South Korea":"韓国",Australia:"オーストラリア",
   Iran:"イラン",Uzbekistan:"ウズベキスタン","Saudi Arabia":"サウジアラビア",China:"中国","New Zealand":"ニュージーランド",Suriname:"スリナム",Curacao:"キュラソー","Curaçao":"キュラソー"};
+const NAT_ISO={"England":"gb-eng","Scotland":"gb-sct","Wales":"gb-wls","Ireland":"ie","Spain":"es","Italy":"it","Germany":"de","France":"fr","Portugal":"pt","Netherlands":"nl","Belgium":"be","Switzerland":"ch","Austria":"at","Denmark":"dk","Sweden":"se","Norway":"no","Finland":"fi","Iceland":"is","Poland":"pl","Czech Republic":"cz","Czechia":"cz","Slovakia":"sk","Hungary":"hu","Croatia":"hr","Serbia":"rs","Slovenia":"si","Bosnia and Herzegovina":"ba","Montenegro":"me","North Macedonia":"mk","Macedonia":"mk","Albania":"al","Kosovo":"xk","Greece":"gr","Turkey":"tr","Türkiye":"tr","Romania":"ro","Bulgaria":"bg","Ukraine":"ua","Russia":"ru","Belarus":"by","Georgia":"ge","Armenia":"am","Azerbaijan":"az","Kazakhstan":"kz","Israel":"il","Luxembourg":"lu","Cyprus":"cy","Malta":"mt","Estonia":"ee","Latvia":"lv","Lithuania":"lt","Moldova":"md","Faroe Islands":"fo","Andorra":"ad","Liechtenstein":"li","San Marino":"sm","Gibraltar":"gi","Brazil":"br","Argentina":"ar","Uruguay":"uy","Colombia":"co","Chile":"cl","Ecuador":"ec","Paraguay":"py","Peru":"pe","Venezuela":"ve","Bolivia":"bo","Mexico":"mx","USA":"us","United States":"us","Canada":"ca","Jamaica":"jm","Costa Rica":"cr","Honduras":"hn","Panama":"pa","El Salvador":"sv","Guatemala":"gt","Haiti":"ht","Trinidad and Tobago":"tt","Cuba":"cu","Dominican Republic":"do","Martinique":"mq","Guadeloupe":"gp","French Guiana":"gf","Grenada":"gd","Suriname":"sr","Guyana":"gy","Curacao":"cw","Curaçao":"cw","Morocco":"ma","Algeria":"dz","Tunisia":"tn","Egypt":"eg","Libya":"ly","Senegal":"sn","Nigeria":"ng","Ghana":"gh","Ivory Coast":"ci","Côte d'Ivoire":"ci","Cameroon":"cm","Mali":"ml","Burkina Faso":"bf","Guinea":"gn","Congo DR":"cd","DR Congo":"cd","Congo":"cg","Gabon":"ga","Cape Verde Islands":"cv","Cape Verde":"cv","Angola":"ao","South Africa":"za","Zambia":"zm","Zimbabwe":"zw","Gambia":"gm","Guinea-Bissau":"gw","Equatorial Guinea":"gq","Benin":"bj","Togo":"tg","Niger":"ne","Chad":"td","Central African Republic":"cf","Sierra Leone":"sl","Liberia":"lr","Mauritania":"mr","Comoros":"km","Madagascar":"mg","Mozambique":"mz","Kenya":"ke","Uganda":"ug","Tanzania":"tz","Rwanda":"rw","Burundi":"bi","Ethiopia":"et","Sudan":"sd","South Sudan":"ss","Eritrea":"er","Somalia":"so","Namibia":"na","Botswana":"bw","Malawi":"mw","Japan":"jp","Korea Republic":"kr","South Korea":"kr","Korea DPR":"kp","North Korea":"kp","Australia":"au","New Zealand":"nz","Iran":"ir","Iraq":"iq","Syria":"sy","Lebanon":"lb","Jordan":"jo","Palestine":"ps","Saudi Arabia":"sa","Qatar":"qa","United Arab Emirates":"ae","Kuwait":"kw","Bahrain":"bh","Oman":"om","Yemen":"ye","Uzbekistan":"uz","Tajikistan":"tj","Kyrgyzstan":"kg","Turkmenistan":"tm","China":"cn","China PR":"cn","Hong Kong":"hk","Taiwan":"tw","Chinese Taipei":"tw","Thailand":"th","Vietnam":"vn","Indonesia":"id","Malaysia":"my","Philippines":"ph","Singapore":"sg","India":"in","Pakistan":"pk","Bangladesh":"bd","Afghanistan":"af","New Caledonia":"nc","Tahiti":"pf"};
+/* country name (players endpoint, English) -> emoji flag; England/Scotland/Wales use the tag-sequence flags. Unknown names (e.g. Northern Ireland, which has no emoji flag) give "" */
+function natFlag(n){const c=NAT_ISO[n];if(!c)return "";
+  if(c.startsWith("gb-"))return "\u{1F3F4}"+[..."gb"+c.slice(3)].map(ch=>String.fromCodePoint(0xE0000+ch.charCodeAt(0))).join("")+"\u{E007F}";
+  return [...c.toUpperCase()].map(ch=>String.fromCodePoint(0x1F1E6+ch.charCodeAt(0)-65)).join("")}
+/* nationality per player apiId from the saved player info (profile only, no season stats, so no spoiler): newest snapshot that has him */
+function natMap(){const m={};["home","away"].forEach(t=>{const T=S.data.teams[t];if(!T||!T.apiId)return;
+  piSnaps(T.apiId).forEach(sn=>Object.entries(sn.p||{}).forEach(([id,x])=>{if(x&&x.n)m[id]=x.n}))});return m}
 function kickoffOf(d){if(!d)return null;if(d.kickoff)return d.kickoff;
   const id=entryId(d),r=id&&ls.get("tacboard.recent",[]).find(x=>String(x.id)===id);
   return r&&r.date?Date.parse(r.date+"T00:00:00+09:00"):null}   /* older saved matches: start of the match day (earlier than the real kickoff, so still safe) */
@@ -1618,6 +1629,7 @@ async function fetchPinfo(t){const T=S.data.teams[t],season=seasonOf(S.data);if(
     if(!Object.keys(p).length)throw new Error(seasonLabel(y)+" シーズンの選手情報がありませんでした");
     piStore(T.apiId,{at:Date.now(),season:y,p},season,kickoffOf(S.data));
     PC_MSG=`${seasonLabel(y)} シーズンの ${Object.keys(p).length} 人分を取得しました `+quotaText();
+    render();
   }catch(e){PC_MSG=e.message||"取得できませんでした";PC_ERR=true}
   PC_BUSY=false;if(PC_PID)renderPinfo()}
 /* one player who was not in this club's squad that season: his stats at every club (1 request), added to the team's snapshot */
@@ -1628,6 +1640,7 @@ async function fetchPinfoSolo(pid){const p=pmap()[pid],t=pcTeam(pid),T=S.data.te
     const list=piSnaps(T.apiId),snap=list.find(s=>s.at===info.pre.at&&s.season===info.pre.season);
     if(snap){snap.p[p.apiId]={...piPlayer(r[0]),solo:true};try{localStorage.setItem(piKey(T.apiId),JSON.stringify(list))}catch(e){throw new Error("端末の保存容量が足りませんでした")}}
     PC_MSG="取得しました "+quotaText();
+    render();
   }catch(e){PC_MSG=e.message||"取得できませんでした";PC_ERR=true}
   PC_BUSY=false;if(PC_PID)renderPinfo()}
 $("pcard").addEventListener("click",e=>{
