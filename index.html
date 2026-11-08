@@ -489,7 +489,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261108231926">20261108231926</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261108232410">20261108232410</span></p>
 </div>
 
 <script>
@@ -940,8 +940,8 @@ function benchBottom(rows){return BENCH_Y0+(rows-1)*BENCH_DY+6.5}
 /* player ratings (from the full-match player stats) shown only while 試合終了 → スタッツ is open */
 function ratingMap(){const ps=S.data.stats&&S.data.stats.players;if(!ps||!STATS_OPEN.ft||norm(S.applied).seg!=="FT")return null;
   const m={};["home","away"].forEach(t=>(ps[t]||[]).forEach(x=>{const v=parseFloat(x.rt);if(x.pid&&v>0)m[x.pid]=v}));return m}
-/* nationality flag: small, outside the circle at the lower left, above the name (pitch only; the bench strip is too tight) */
-function flagSvg(f){return f?`<text x="-3.2" y="3.05" text-anchor="middle" font-size="1.35" pointer-events="none">${f}</text>`:""}
+/* nationality flag: outside the circle at the lower left, touching it, above the name (bench too, overlapping is accepted) */
+function flagSvg(f){return f?`<text x="-2.75" y="2.95" text-anchor="middle" font-size="1.75" pointer-events="none">${f}</text>`:""}
 function ratingSvg(v){if(!v)return "";const c=v>=8?"#1f8a52":v>=7?"#3d7fbf":v>=6?"#7a7f86":"#c0503a";
   return `<g pointer-events="none"><rect x="-4.6" y="-4.3" width="3.6" height="2.2" rx=".5" fill="${c}" stroke="rgba(0,0,0,.4)" stroke-width=".15"/>
     <text x="-2.8" y="-2.65" text-anchor="middle" font-size="1.55" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="#fff">${v.toFixed(1)}</text></g>`}
@@ -957,7 +957,7 @@ function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier,rt,nat}){
     ${face?`<image class="face" href="${esc(fu)}" x="-2.3" y="-2.3" width="4.6" height="4.6" clip-path="url(#fc)" preserveAspectRatio="xMidYMin slice" pointer-events="none"/><circle class="facering" r="2.4" fill="none" stroke="${gk?bg:col}" stroke-width=".55"/>`:""}
     ${markSvg(m,showM)}
     ${rt?ratingSvg(rt[p.id]):""}
-    ${!bench&&nat&&p.apiId!=null?flagSvg(natFlag(nat[p.apiId])):""}
+    ${nat&&p.apiId!=null?flagSvg(natFlag(nat[p.apiId])):""}
     <text class="pname" data-plain="${esc(sh)}" y="${ly}" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(face&&p.num!==""?p.num+" "+sh:sh)}</text>
   </g>`}
 /* kit number colour when it stands out from the shirt colour, else black / white */
