@@ -182,7 +182,8 @@ h3.sub{margin:4px 0 0;font-size:13px;color:var(--muted);font-weight:500}
 .pst{border-collapse:collapse;font-size:13px;white-space:nowrap;width:100%}
 .pst th,.pst td{padding:5px 7px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
 .pst th:first-child,.pst td:first-child{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1}
-.pst td:first-child{white-space:normal;overflow-wrap:anywhere;min-width:7.5em;max-width:11em;line-height:1.35;box-shadow:1px 0 0 var(--line)}.pst td img.face{max-width:none}   /* long names wrap inside the fixed column instead of running over 分 */
+.pst th:first-child,.pst td:first-child{box-shadow:1px 0 0 var(--line)}.pst td img.face{max-width:none}
+.pst .pnm{display:inline-block;white-space:nowrap}.pst td.pn .pnm{text-decoration:underline dotted;text-underline-offset:3px}   /* the name column is set to the team's longest name (fitPst), so names never run over 分 */
 .pst th button{font:inherit;font-size:12px;border:0;background:none;color:var(--muted);padding:2px 0;cursor:pointer}.pst th button.on{color:var(--accent);font-weight:700;text-decoration:underline}
 .stfoot{display:flex;gap:8px;align-items:center;justify-content:flex-end;font-size:12px;color:var(--muted);margin:8px 0 0}
 button.link{border:0;background:none;color:var(--accent);font:inherit;text-decoration:underline;cursor:pointer;padding:0}
@@ -488,7 +489,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261108132617">20261108132617</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261108133114">20261108133114</span></p>
 </div>
 
 <script>
@@ -819,7 +820,7 @@ function render(){
       ${rows.map(r=>r.mk?markerHtml(r):`<div class="c h">${r.home.map(evHtml).join("")}</div><button class="tm" data-t="${esc(r.t)}" aria-label="${esc(r.label)}に移動">${esc(r.label)}</button><div class="c">${r.away.map(evHtml).join("")}</div>`).join("")}
     </div>`;
   }
-  renderTime();renderFmSelects();renderInj();renderInfoBtn();renderTeamLg();renderLive();
+  renderTime();renderFmSelects();renderInj();renderInfoBtn();renderTeamLg();renderLive();fitPst();
 }
 /* ---------- period markers and stats in 反映済みの出来事 ----------
    前半終了 shows once the board is in the 2nd half, 90分終了 / 延長終了 once it is in extra time / the shoot-out,
@@ -864,7 +865,13 @@ function playerStatsHtml(ps){if(!ps)return "";const T=S.data.teams,list=(ps[PS_T
   const nm=r=>{const p=pm[r.pid];return p?(p.num!==""?p.num+" ":"")+pName(p):r.name};
   return `<div class="pstab">${["home","away"].map(t=>`<button class="ghost${PS_TEAM===t?" on":""}" data-psteam="${t}">${logo(T[t].apiId)}${esc(tName(T[t].apiId,T[t].name))}</button>`).join("")}</div>
     <div class="pswrap"><table class="pst"><thead><tr><th>選手</th>${PS_COLS.map(([k,l])=>`<th><button data-pssort="${k}" class="${PS_SORT===k?"on":""}">${l}</button></th>`).join("")}</tr></thead>
-    <tbody>${list.map(r=>`<tr><td${r.pid&&pm[r.pid]?` class="pn" data-pinfo="${esc(r.pid)}"`:""}>${pm[r.pid]?faceImg(pm[r.pid]):""}${esc(nm(r))}${r.cap?`<span class="cap" title="キャプテン">C</span>`:""}</td>${PS_COLS.map(([k])=>`<td>${r[k]==null||r[k]===""?"–":esc(r[k])}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${PS_COLS.length+1}">データがありません</td></tr>`}</tbody></table></div>`}
+    <tbody>${list.map(r=>`<tr><td${r.pid&&pm[r.pid]?` class="pn" data-pinfo="${esc(r.pid)}"`:""}><span class="pnm">${pm[r.pid]?faceImg(pm[r.pid]):""}${esc(nm(r))}${r.cap?`<span class="cap" title="キャプテン">C</span>`:""}</span></td>${PS_COLS.map(([k])=>`<td>${r[k]==null||r[k]===""?"–":esc(r[k])}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${PS_COLS.length+1}">データがありません</td></tr>`}</tbody></table></div>`}
+/* width of the fixed name column = the longest name of the team shown (face, number, name and C included) */
+function fitPst(){document.querySelectorAll(".pst").forEach(t=>{const cells=[...t.querySelectorAll("tr>:first-child")];
+  cells.forEach(c=>{c.style.minWidth=c.style.width=""});
+  const w=Math.max(0,...[...t.querySelectorAll(".pnm")].map(x=>Math.ceil(x.getBoundingClientRect().width)));if(!w)return;
+  const td=t.querySelector("tbody td:first-child"),cs=td&&getComputedStyle(td),pad=cs?parseFloat(cs.paddingLeft)+parseFloat(cs.paddingRight):14;
+  cells.forEach(c=>{c.style.minWidth=c.style.width=(w+pad+1)+"px"})})}
 function statsPanel(kind){const st=S.data.stats||{};let h="";
   if(STATS_BUSY===kind)return `<p class="empty">取得しています…</p>`;
   if(kind==="ht"){
