@@ -230,11 +230,15 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .wx{font-size:14px}
 .jump{position:fixed;left:max(10px,env(safe-area-inset-left,0px));top:max(10px,env(safe-area-inset-top,0px));z-index:40;display:flex;flex-direction:column-reverse;align-items:flex-start;gap:6px}   /* top left; the button comes first, the menu opens below it */
 .score,.wrap>.tmprompt{padding-left:52px}   /* room for the ☰ button at the top left */
-.jmenu{max-height:calc(100vh - 80px);overflow-y:auto}
 .jbtn{width:42px;height:42px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--fg);opacity:.85;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
-.jmenu{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.25);overflow:hidden}
+.jmenu{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:0 4px 16px rgba(0,0,0,.25);max-height:calc(100vh - 70px - env(safe-area-inset-top,0px));max-height:calc(100dvh - 70px - env(safe-area-inset-top,0px) - env(safe-area-inset-bottom,0px));overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .jmenu button{border:0;border-bottom:1px solid var(--line);background:none;padding:9px 18px;font-size:14px;text-align:left}
 .jmenu button:last-child{border-bottom:0}
+@media (max-height:520px){   /* phone in landscape: two columns so every item fits, still scrolls if not */
+.jmenu{display:grid;grid-template-columns:auto auto}
+.jmenu button{padding:8px 16px;border-right:1px solid var(--line)}
+.jmenu button:nth-child(2n){border-right:0}
+.jmenu button:nth-last-child(-n+2):nth-child(odd),.jmenu button:last-child{border-bottom:0}}
 .ev .evn{font-size:11px;color:var(--muted);margin-left:2px}
 .ev .badge{display:inline-block;min-width:calc(2em + 12px);box-sizing:border-box;text-align:center}   /* OG / VAR as wide as the two-kanji labels */
 .gi{font-size:13px;margin-right:2px}   /* ⚽ / 👟 before a scorer or assister */
@@ -489,7 +493,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261108233605">20261108233605</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261109105258">20261109105258</span></p>
 </div>
 
 <script>
