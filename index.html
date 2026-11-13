@@ -392,7 +392,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
       <div class="tmbox" id="tmBox">
         <h3 class="sub">登録チーム</h3>
         <div class="tmlist" id="tmList"></div>
-        <div id="tmFxBox"><p class="hint" style="margin:4px 0 0">登録チームの試合(保存済みの試合一覧から。前日〜翌日)</p><ul class="fxlist" id="tmFx"></ul><div class="frow" style="margin-top:6px"><button class="ghost" id="tmFetch">試合一覧を取得(前日・当日・翌日。APIを3回使います)</button></div></div>
+        <div id="tmFxBox"><p class="hint" style="margin:4px 0 0">登録チームの試合(保存済みの試合一覧から。前日〜翌日)</p><ul class="fxlist" id="tmFx"></ul><div class="frow" style="margin-top:6px"><button class="ghost" id="tmFetch">試合一覧を取得(前日・当日・翌日。0〜9時は2日前〜当日。APIを3回使います)</button></div></div>
         <div class="frow"><button class="ghost" id="tmCheck">登録チームの試合を今すぐ確認</button></div>
         <p class="hint">前日と当日の試合一覧(2回)と、終わった試合1つにつき2回、APIを使います。終わった試合だけを保存し、結果は表示しません。</p>
         <div class="fmsg" id="tmMsg"></div>
@@ -404,6 +404,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
         <button class="ghost" id="fNext" aria-label="次の日">翌日</button>
         <button class="update" id="fSearch" style="margin-left:0">検索</button>
       </div>
+      <p class="hint" id="fEarly" hidden style="margin:0">日本時間の0〜9時は、APIの日付の区切り(UTC)に合わせて、翌日の検索は9時からになります(この時間は2日前まで検索できます)</p>
       <label class="field kw">キーワードで探す(リーグの選択に関係なく、その日の全試合から)<input type="search" id="fKw" placeholder="例: オランダ、エールディヴィジ、Ajax" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="search"></label>
       <div class="lgs" id="fLeagues"></div>
       <div class="fmsg" id="fMsg"></div>
@@ -493,7 +494,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261109105444">20261109105444</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261113193217">20261113193217</span></p>
 </div>
 
 <script>
@@ -1362,6 +1363,10 @@ function renderNameBox(){const m=missingNames(),nt=Object.keys(NAMES.teams||{}).
   $("nmInfo").textContent=`対応表: チーム ${nt} / 選手 ${np}${NAMES.updated?`(${NAMES.updated} 更新)`:""} ・ 未登録: チーム ${m.teams.length} / 選手 ${m.players.length}${other?` / 大会・監督・会場・審判 ${other}`:""}`;
   $("nmCopy").disabled=$("nmShare").disabled=!missCount(m)}
 const todayJST=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
+/* the free plan's limit (yesterday..tomorrow) follows the API's UTC day: from 0:00 to 9:00 in Japan the Japanese "tomorrow" is two days ahead in UTC and is refused */
+const apiRange=()=>{const u=new Date().toISOString().slice(0,10);return [shiftDate(u,-1),shiftDate(u,1)]};
+const daysIn=(lo,hi)=>{const o=[];for(let d=lo;d<=hi;d=shiftDate(d,1))o.push(d);return o};
+const md=d=>d.slice(5).replace("-","/");
 function shiftDate(d,n){const x=new Date(d+"T12:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
 let quota=null;
 async function api(path){
@@ -1443,7 +1448,8 @@ const slimFx=f=>({fixture:{id:f.fixture.id,date:f.fixture.date,timestamp:f.fixtu
 $("fSearch").onclick=search;
 /* the last search is kept (slimmed: no score or status) so the list is there again after the app restarts */
 /* lists are kept per date, only for the dates the free plan serves (yesterday..tomorrow); older dates are dropped */
-const fxRange=()=>{const t=todayJST();return [shiftDate(t,-1),shiftDate(t,1)]};
+/* kept lists: what the API serves now plus the Japanese tomorrow (it becomes searchable again at 9:00) */
+const fxRange=()=>[apiRange()[0],shiftDate(todayJST(),1)];
 const slimKeep=f=>{const x=slimFx(f);if(f.done!=null)x.done=f.done;return x};   /* never keeps scores, keeps a known finished flag */
 function fxDays(){const [lo,hi]=fxRange();let o=ls.get("tacboard.fxDays",null);
   if(!o||!o.days){o={last:null,days:{}};const s=ls.get("tacboard.lastFx",null);   /* the older single-day save */
@@ -1459,7 +1465,7 @@ function restoreFx(){const o=fxDays();ls.set("tacboard.fxDays",o);const d=$("fDa
 function gotoDay(auto){dateRange();if(showFxDay($("fDate").value))return;
   if(auto){search();return}lastFx=null;$("fList").innerHTML="";fmsg("fMsg","この日の一覧はまだありません。「検索」で取得します")}
 /* the free plan only serves yesterday, today and tomorrow */
-function dateRange(){const t=todayJST(),lo=shiftDate(t,-1),hi=shiftDate(t,1),d=$("fDate");d.min=lo;d.max=hi;
+function dateRange(){const t=todayJST(),[lo,hi]=apiRange(),d=$("fDate");d.min=lo;d.max=hi;$("fEarly").hidden=hi>=shiftDate(t,1);
   if(!d.value||d.value<lo||d.value>hi)d.value=t;$("fPrev").disabled=d.value<=lo;$("fNext").disabled=d.value>=hi}
 $("fDate").onchange=()=>gotoDay(false);
 $("fPrev").onclick=()=>{$("fDate").value=shiftDate($("fDate").value||todayJST(),-1);gotoDay(true)};
@@ -2031,9 +2037,9 @@ function renderTeamLg(){const d=S.data,i=d.info||{},T=d.teams,el={home:$("lgH"),
     el[t].innerHTML=`${lgLogo(id)}${esc([JA&&NAT_JA[c]||c,lgName(id,name)].filter(Boolean).join(" "))}`;el[t].hidden=false})}
 /* registered teams' matches across the saved day lists (yesterday..tomorrow), no API; days not searched yet are named */
 function renderTeamFx(){const ids=new Set(myTeams().map(x=>x.id)),box=$("tmFxBox");if(!ids.size){box.hidden=true;return}box.hidden=false;
-  const o=fxDays(),[lo,hi]=fxRange(),days=[lo,shiftDate(lo,1),hi],rows=[];
+  const o=fxDays(),days=daysIn(...fxRange()),rows=[];
   days.forEach(d=>{const v=o.days[d];if(v)v.list.filter(f=>ids.has(f.teams.home.id)||ids.has(f.teams.away.id)).sort((a,b)=>a.fixture.timestamp-b.fixture.timestamp).forEach(f=>rows.push([d,f]))});
-  const miss=days.filter(d=>!o.days[d]).map(d=>d.slice(5).replace("-","/"));
+  const miss=days.filter(d=>!o.days[d]).map(md);
   $("tmFx").innerHTML=rows.map(([d,f])=>`<li><span class="ko" style="font-size:13px">${esc(d.slice(5).replace("-","/"))}<span class="kot">${esc(f.fixture.date.slice(11,16))}</span></span>
       <span class="vs"><span class="lg">${lgLogo(f.league.id)}${esc(lgName(f.league.id,f.league.name))}</span>${logo(f.teams.home.id)}${esc(tName(f.teams.home.id,f.teams.home.name))} vs ${logo(f.teams.away.id)}${esc(tName(f.teams.away.id,f.teams.away.name))}</span>
       <button class="ghost" data-tmfx="${f.fixture.id}">${loadedFx(f.fixture.id)?"再読み込み":"読み込む"}</button></li>`).join("")
@@ -2067,10 +2073,10 @@ async function checkTeams(){
 }
 $("tmCheck").onclick=checkTeams;
 /* fetch the day lists for yesterday..tomorrow (3 requests) so the registered teams' matches show; the last viewed date stays */
-$("tmFetch").onclick=async()=>{const b=$("tmFetch"),[lo]=fxRange(),days=[lo,shiftDate(lo,1),shiftDate(lo,2)];let n=0;
+$("tmFetch").onclick=async()=>{const b=$("tmFetch"),days=daysIn(...apiRange());let n=0;
   b.disabled=true;fmsg("tmMsg","試合一覧を取得しています…");
   try{for(const d of days){const list=await api(`fixtures?date=${d}&timezone=Asia/Tokyo`);putFxDay(d,Date.now(),list,true);n++}
-    fmsg("tmMsg","前日・当日・翌日の試合一覧を取得しました")}
+    fmsg("tmMsg",`${md(days[0])}〜${md(days[days.length-1])} の試合一覧を取得しました`)}
   catch(e){fmsg("tmMsg",e.message+(n?`(${n} 日分は取得済み)`:""),true)}
   gotoDay(false);b.disabled=false};
 $("tmGo").onclick=()=>{$("finder").open=true;checkTeams();setTimeout(()=>$("tmBox").scrollIntoView({behavior:"smooth",block:"center"}),50)};
@@ -2097,6 +2103,7 @@ $("finder").addEventListener("toggle",()=>{if($("finder").open)renderNameBox()})
 $("nmReload").onclick=async()=>{$("nmReload").disabled=true;fmsg("nmMsg","読み直しています…");const r=await loadNames();$("nmReload").disabled=false;
   renderNameBox();fmsg("nmMsg",r==="new"?"新しい対応表を反映しました":r==="same"?"対応表は最新です(変更はありません)":"読み直せませんでした。通信状態を確認してください",r==="fail")};
 
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)dateRange()});   /* crossing 9:00 while the app sleeps */
 learnAll();$("fDate").value=todayJST();dateRange();renderUsage();renderLeagues();restoreFx();renderRecent();renderKey();renderTeams();promptCheck();renderNameBox();loadNames();checkUpdate();
 
 buildChips();renderEditor();render();
