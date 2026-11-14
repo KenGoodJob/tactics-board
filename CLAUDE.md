@@ -26,6 +26,7 @@
 - 出来事の種類ラベルは同じ幅(2文字分。OG・VAR も「得点」等と揃える)。得点は名前の前に ⚽、アシストは「(👟 名前)」(2026-11-08 にユーザーの依頼で変更。以前は「A」)
 - 最新のデータに更新(2026-11-08 にユーザーの依頼で追加): 時間設定欄の下の「最新のデータに更新」(API の試合で、端末に保存されていない=終わる前に読み込んだ試合だけ表示)。読み込みと同じ取得(まとめて取得なら2回)をして試合データだけ差し替え、時間・反映済みの時点・配置はそのまま。新しい出来事は時間表示のタップで反映したときに出る(メッセージに件数などは出さない)。ユニフォームの色は表示中のものを残し、応答に無い試合情報・欠場者・監督は前のものを残す。終了済みになっていれば保存する
 - 出来事の補足(追加のAPIなし、events から): PKによる得点は名前の後に小さく「(PK)」(detail "Penalty" → `pen:true`)、試合中のPK失敗は「PK失敗」(detail "Missed Penalty" → type `pen_miss`、スコアに影響なし)、警告・退場の理由は名前の後に小さく(comments → `why`、`CARD_WHY` で日本語化、未知は英語)、VAR は「VAR」+判定(type "Var" の detail → type `var`・`note`、`varJa` で「ゴール取り消し(オフサイド)」「PK判定」など、未知は英語)と対象選手。選手一覧のタグにも「得点(PK)」「PK失敗」「警告 17'(反則)」。この機能より前に保存した試合には無い(一覧から消して読み込み直せば付く)
+- 監督・ベンチスタッフへの警告・退場(2026-11-15 にユーザーの依頼で追加): カードの相手が選手一覧にいないとき、そのチームの監督(lineups の coach と ID・名前・姓のどれかが一致)なら event に `staff:"coach"`、それ以外は `staff:"bench"`、どちらも API の名前を `sname` に残す。「反映済みの出来事」と「試合データを編集」に「アンチェロッティ(監督)」(names.json の監督名、無ければ英語)/「名前(ベンチ)」と出す。盤面・選手一覧・スコア欄の赤いカード(退場者の人数)には影響させない。API-Football にあるスタッフ情報は監督1人だけ。この機能より前に保存した試合は名前が残っておらず「(不明)」「?」のまま(一覧から消して読み込み直せば付く)。ファイル読み込みでは why と同じ補足の扱い
 - スタッツ(API の試合のみ): 前半終了・試合終了の行の「スタッツ ▸」で広げる/畳む。**最初に広げたときだけ取得**し、`data.stats` に保存(保存済みの試合なら端末の保存分も更新)。「取り直す」あり
   - 項目名は `STAT_JA` で日本語化(Free Kicks=フリーキック 等)。未知の項目は英語のまま末尾に出す
   - 試合全体: `fixtures/statistics?fixture=&half=true`(エラーなら half なし)で1回。前半は応答の `statistics_1h` 等があるときだけ表示し、無ければ「取得できませんでした(応答の項目: …)」。**前半の行に試合全体の数字は出さない**
@@ -147,7 +148,7 @@
 { fixture(APIの試合のみ), kickoff・season・info(APIの試合のみ、この機能以降), teams: { home|away: { name, apiId(APIのみ), color, formation, coach({id,name}、APIのみ), players: [{id, num, name, pos(G|D|M|F、省略可), starter}] } },
   events: [{ id, type: goal|og|sub|yellow|red|pso_goal|pso_miss, team, period: 1H|2H|ET1|ET2|PK,
              min, add, player, playerIn(subのみ), assist(goalのみ・省略可), pen(goalのみ・PKなら true), why(yellow・redの理由、省略可),
-             note(varのみ、APIの detail) }] }
+             note(varのみ、APIの detail), staff(coach|bench、選手以外へのカード)・sname(その英語名) }] }
   type には pen_miss(試合中のPK失敗)・var もある。teams.* には numColor・gkColor・gkNum(省略可)
 ```
 - スタメンは先頭11人。GK、DF(右→左)、MF(右→左)、FW の順

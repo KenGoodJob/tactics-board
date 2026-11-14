@@ -494,7 +494,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261114225202">20261114225202</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261115010652">20261115010652</span></p>
 </div>
 
 <script>
@@ -647,6 +647,8 @@ function cleanData(d){if(!d||typeof d!=="object")return d;setId(d,"fixture");
     ["numColor","gkColor","gkNum"].forEach(k=>{if(T[k]!=null){const c=safeColor(T[k]);if(c)T[k]=c;else delete T[k]}});
     if(T.coach){if(typeof T.coach!=="object")delete T.coach;else setId(T.coach,"id")}
     if(Array.isArray(T.players))T.players.forEach(p=>{if(p&&typeof p==="object")setId(p,"apiId")})});
+  if(Array.isArray(d.events))d.events.forEach(e=>{if(!e||typeof e!=="object")return;
+    if(e.staff!=="coach"&&e.staff!=="bench")delete e.staff;if(e.sname!=null)e.sname=String(e.sname).slice(0,60)});
   return d}
 function cleanFxItem(f){if(!f||!f.fixture||!f.league||!f.teams)return null;setId(f.fixture,"id");setId(f.league,"id");
   ["home","away"].forEach(s=>{if(f.teams[s])setId(f.teams[s],"id")});return f.fixture.id?f:null}
@@ -735,6 +737,10 @@ function buildChips(){$("segChips").innerHTML=SEGS.map(s=>`<button class="segbtn
 /* ---------- state at time ---------- */
 function players(t){return S.data.teams[t].players}
 function pmap(){const m={};["home","away"].forEach(t=>players(t).forEach(p=>m[p.id]=p));return m}
+/* coach / bench staff named in a card event: "アンチェロッティ(監督)", others "name(ベンチ)" */
+function staffName(e){if(e.staff==="coach"){const c=S.data.teams[e.team]&&S.data.teams[e.team].coach;
+    return ((c&&JA&&coachJa(c))||unent(c&&c.name||e.sname||""))+"(監督)"}
+  return (unent(e.sname||"")||"不明")+"(ベンチ)"}
 const CARD_Y=`<i class="cd y"></i>`,CARD_R=`<i class="cd r"></i>`;
 function compute(t){const idx=ord(t);
   const st={slots:{},score:{home:0,away:0},pk:{home:0,away:0},pkUsed:false,log:[],tags:{},marks:{},reds:{home:[],away:[]},y2:new Set()};
@@ -743,6 +749,7 @@ function compute(t){const idx=ord(t);
   const tag=(id,cls,txt,pre)=>{if(id)(st.tags[id]=st.tags[id]||[]).push({cls,txt,pre})};
   const mk=id=>id?(st.marks[id]=st.marks[id]||{g:0,a:0,y:0,r:0}):{g:0,a:0,y:0,r:0};
   evs.forEach(({e})=>{
+    if(e.staff){if(e.type==="red"&&e.second)st.y2.add(e.id);st.log.push(e);return}   /* coach / bench staff: no effect on players or the red-card count */
     const sl=st.slots[e.team]||[];const lab=evLabel(e);
     if(e.type==="sub"){const k=sl.indexOf(e.player);if(k>=0&&e.playerIn)sl[k]=e.playerIn;tag(e.player,"out","OUT "+lab);tag(e.playerIn,"in","IN "+lab)}
     else if(e.type==="red"){const k=sl.indexOf(e.player);if(k>=0)sl[k]=null;
@@ -839,7 +846,7 @@ function render(){
   if(!st.log.length&&!markers(st).length){$("log").innerHTML=`<p class="empty">まだ反映された出来事はありません。</p>`}
   else{
     const n=id=>pm[id]?`<span class="pn" data-pinfo="${esc(id)}">${faceImg(pm[id])}${esc(pShort(pm[id]))}</span>`:"?";
-    const evHtml=e=>{const cards=e.type==="yellow"?CARD_Y:e.type==="red"?(st.y2.has(e.id)?CARD_Y+CARD_Y:CARD_R):"";const nt=evNote(e),txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="var"?`${esc(nt)}${e.player?" "+n(e.player):""}`:(e.type==="goal"?`<span class="gi">⚽</span>${n(e.player)}${e.assist?`(<span class="gi">👟</span>${n(e.assist)})`:""}`:n(e.player))+(nt?`<small class="evn">(${esc(nt)})</small>`:"");
+    const evHtml=e=>{const cards=e.type==="yellow"?CARD_Y:e.type==="red"?(st.y2.has(e.id)?CARD_Y+CARD_Y:CARD_R):"";const nt=evNote(e),txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="var"?`${esc(nt)}${e.player?" "+n(e.player):""}`:(e.type==="goal"?`<span class="gi">⚽</span>${n(e.player)}${e.assist?`(<span class="gi">👟</span>${n(e.assist)})`:""}`:e.staff?`<span class="pn">${esc(staffName(e))}</span>`:n(e.player))+(nt?`<small class="evn">(${esc(nt)})</small>`:"");
       return `<div class="ev"><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span><span>${cards}${txt}</span></div>`};
     /* shoot-out: one row per round (n-th kick of each side) */
     const pkN={home:0,away:0};
@@ -1272,7 +1279,7 @@ function renderEvRows(){
   const rows=S.data.events.map((e,o)=>({e,o,i:evOrd(e)})).sort((a,b)=>a.i-b.i||a.o-b.o);
   $("evRows").innerHTML=rows.length?rows.map(({e})=>{
     const n=id=>pm[id]?pm[id].num+" "+pm[id].name:"(不明)";
-    const nt=evNote(e),txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="var"?nt+(e.player?" "+n(e.player):""):(e.type==="goal"&&e.assist?`${n(e.player)}(アシスト ${n(e.assist)})`:n(e.player))+(nt?`(${nt})`:"");
+    const nt=evNote(e),txt=e.type==="sub"?`${n(e.playerIn)} ← ${n(e.player)}`:e.type==="var"?nt+(e.player?" "+n(e.player):""):(e.type==="goal"&&e.assist?`${n(e.player)}(アシスト ${n(e.assist)})`:e.staff?staffName(e):n(e.player))+(nt?`(${nt})`:"");
     return `<tr><td>${esc(evLabel(e))}</td><td><span class="badge" style="background:${TYPE_COLOR[e.type]}">${TYPE_LABEL[e.type]}</span></td><td>${esc(T[e.team].name)}</td><td>${esc(txt)}</td><td style="text-align:right"><button class="del" data-del="${esc(e.id)}">削除</button></td></tr>`}).join("")
     :`<tr><td colspan="5" class="empty">出来事はまだありません。</td></tr>`;
 }
@@ -1528,6 +1535,11 @@ function convert(fx,lineups,events){
   }
   const find=(s,p)=>{if(!p)return null;const ps=teams[s].players;
     return (ps.find(x=>p.id!=null&&x.apiId===p.id)||ps.find(x=>x.name===p.name)||{}).id||null};
+  /* a card for someone not in the squad list (head coach or other bench staff): keep who it was, without touching the players */
+  const lastW=n=>{const w=String(n||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);return w[w.length-1]||""};
+  const staffOf=(T,p)=>{if(!p||(p.id==null&&!p.name))return {};const c=T&&T.coach,nm=String(p.name||"").slice(0,60);
+    const isC=c&&((p.id!=null&&c.id===p.id)||(nm&&(fold(nm)===fold(c.name)||lastW(nm)&&lastW(nm)===lastW(c.name))));
+    return {staff:isC?"coach":"bench",...(nm?{sname:nm}:{})}};
   const byId=(s,p)=>p&&p.id!=null&&teams[s].players.some(x=>x.apiId===p.id);
   const whose=p=>["home","away"].find(s=>byId(s,p))||["home","away"].find(s=>find(s,p));
   const on={home:new Set(teams.home.players.filter(p=>p.starter).map(p=>p.id)),away:new Set(teams.away.players.filter(p=>p.starter).map(p=>p.id))};
@@ -1545,7 +1557,8 @@ function convert(fx,lineups,events){
     }else if(type==="card"&&s&&!pso){
       const yc=det.includes("yellow")&&!det.includes("second");
       const why=String(e.comments||"").trim();
-      out.push({...base,type:yc?"yellow":"red",team:s,player:find(s,e.player),...(det.includes("second")?{second:true}:{}),...(why?{why}:{})});
+      const pl=find(s,e.player);
+      out.push({...base,type:yc?"yellow":"red",team:s,player:pl,...(pl?{}:staffOf(teams[s],e.player)),...(det.includes("second")?{second:true}:{}),...(why?{why}:{})});
       if(!(det.includes("yellow")&&!det.includes("second")))on[s].delete(find(s,e.player));
     }else if(type==="subst"&&s){
       let o=find(s,e.player),i=find(s,e.assist);
@@ -1924,8 +1937,8 @@ const pc=o=>{const n=Object.keys(o).length;return n?`と ${n} チームの選手
 /* fill what the saved copy lacks from an imported copy of the same match (injuries, stats, match info, coaches, kickoff, season, positions) */
 /* kit colours and the event details added later (penalty goals, missed penalties, VAR, card reasons) do not make a copy "different" */
 const KIT=["numColor","gkColor","gkNum"],KIT_ALL=["color",...KIT];
-const baseEvents=evs=>evs.filter(e=>e.type!=="var"&&e.type!=="pen_miss").map(e=>{const q={...e};delete q.id;delete q.pen;delete q.why;delete q.note;return q});
-const evExtra=evs=>(evs||[]).filter(e=>e.type==="var"||e.type==="pen_miss"||e.pen||e.why).length;
+const baseEvents=evs=>evs.filter(e=>e.type!=="var"&&e.type!=="pen_miss").map(e=>{const q={...e};delete q.id;delete q.pen;delete q.why;delete q.note;delete q.staff;delete q.sname;return q});
+const evExtra=evs=>(evs||[]).filter(e=>e.type==="var"||e.type==="pen_miss"||e.pen||e.why||e.staff).length;
 function fillExtras(d,src,newer=false){let ch=false;   /* newer: the file's copy was saved later, so its uniform colours (possibly fixed by hand) win */
   if(Array.isArray(src.events)&&evExtra(src.events)>evExtra(d.events)&&sameContent(baseEvents(src.events),baseEvents(d.events||[]))){d.events=src.events;ch=true}const has=v=>v!=null&&!(typeof v==="object"&&!Object.keys(v).length);
   ["kickoff","season"].forEach(k=>{if(!has(d[k])&&has(src[k])){d[k]=src[k];ch=true}});
