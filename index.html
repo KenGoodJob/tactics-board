@@ -494,7 +494,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261114030123">20261114030123</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261114164920">20261114164920</span></p>
 </div>
 
 <script>
@@ -621,11 +621,43 @@ let S=null;
 /* board state lives only for this session: it survives an accidental reload, and is gone once the app or tab is closed */
 try{localStorage.removeItem(KEY)}catch(e){}
 try{S=JSON.parse(sessionStorage.getItem(KEY)||"null")}catch(e){S=null}
+if(S&&S.data)cleanData(S.data);else S=null;
 function kick(){return {seg:"1H",min:0,add:0}}
 const MODES=["nrm","atk","def"];
 function newShape(){return {fm:null,pos:null,work:{}}}
 function newShapes(){const t=()=>({nrm:newShape(),atk:newShape(),def:newShape()});return {home:t(),away:t()}}
-function fresh(data){return {data,shapes:newShapes(),poss:"none",pending:kick(),applied:kick()}}
+function fresh(data){cleanData(data);return {data,shapes:newShapes(),poss:"none",pending:kick(),applied:kick()}}
+/* ---------- safety (HTML injection): values that go into the page without esc() — colors in style/fill, ids in attributes and URLs —
+   are forced into safe shapes whenever match data is opened, and everything read from a pasted JSON or an imported file is cleaned first.
+   Rule for new code: text into innerHTML always through esc(); colors through safeColor(); ids through safeId(). ---------- */
+function safeColor(c){return typeof c==="string"&&/^#[0-9a-f]{3,8}$/i.test(c.trim())?c.trim():null}
+function safeId(v){const n=typeof v==="string"&&/^\d{1,15}$/.test(v)?+v:v;return Number.isSafeInteger(n)&&n>0?n:null}
+function safeNum(v){const n=typeof v==="string"&&v.trim()!==""?+v:v;return typeof n==="number"&&isFinite(n)?n:null}
+/* strips the characters that can open a tag or leave an attribute from every string of an imported object (names never need them) */
+function stripDeep(o,depth=0){if(depth>40)return null;
+  if(typeof o==="string")return o.replace(/[<>"`\u0000-\u0008]/g,"");
+  if(Array.isArray(o))return o.map(x=>stripDeep(x,depth+1));
+  if(o&&typeof o==="object"){const r={};Object.keys(o).forEach(k=>{if(k==="__proto__"||k==="constructor"||k==="prototype")return;r[stripDeep(k,depth+1)]=stripDeep(o[k],depth+1)});return r}
+  return typeof o==="number"||typeof o==="boolean"||o==null?o:null}
+const setId=(o,k)=>{if(o&&o[k]!=null){const v=safeId(o[k]);if(v==null)delete o[k];else o[k]=v}};
+function cleanData(d){if(!d||typeof d!=="object")return d;setId(d,"fixture");
+  if(d.info&&typeof d.info==="object")setId(d.info,"lgId");else delete d.info;
+  ["home","away"].forEach(s=>{const T=d.teams&&d.teams[s];if(!T||typeof T!=="object")return;setId(T,"apiId");
+    T.color=safeColor(T.color)||(s==="home"?"#c8432f":"#2d63c4");
+    ["numColor","gkColor","gkNum"].forEach(k=>{if(T[k]!=null){const c=safeColor(T[k]);if(c)T[k]=c;else delete T[k]}});
+    if(T.coach){if(typeof T.coach!=="object")delete T.coach;else setId(T.coach,"id")}
+    if(Array.isArray(T.players))T.players.forEach(p=>{if(p&&typeof p==="object")setId(p,"apiId")})});
+  return d}
+function cleanFxItem(f){if(!f||!f.fixture||!f.league||!f.teams)return null;setId(f.fixture,"id");setId(f.league,"id");
+  ["home","away"].forEach(s=>{if(f.teams[s])setId(f.teams[s],"id")});return f.fixture.id?f:null}
+function cleanPinfo(all){const out={};if(!all||typeof all!=="object")return out;
+  Object.keys(all).forEach(tid=>{if(!safeId(tid)||!Array.isArray(all[tid]))return;
+    out[tid]=all[tid].filter(sn=>sn&&typeof sn==="object"&&sn.p&&typeof sn.p==="object").map(sn=>{const p={};
+      Object.keys(sn.p).forEach(id=>{const x=sn.p[id];if(!safeId(id)||!x||typeof x!=="object")return;
+        if(Array.isArray(x.st))x.st=x.st.filter(Array.isArray).map(r=>r.map((v,i)=>i===1||i===11?(typeof v==="string"?v:""):i===0||i===2?safeId(v):safeNum(v)));
+        p[id]=x});
+      return {...sn,at:safeNum(sn.at),season:safeId(sn.season),p}})});
+  return out}
 const MODE_NAME={nrm:"ノーマル",atk:"保持時",def:"非保持時"};
 const modeOf=t=>S.poss==="none"?"nrm":S.poss===t?"atk":"def";
 const shapeOf=(t,m=modeOf(t))=>S.shapes[t][m];
@@ -1259,7 +1291,7 @@ function commit(full=true){save();render();if(full){renderEvRows();fillEvPlayers
 $("exportBtn").onclick=()=>{const s=JSON.stringify(S.data,null,1);$("json").value=s;
   const done=()=>{$("jsonMsg").textContent="コピーしました"};
   try{navigator.clipboard.writeText(s).then(done,()=>{$("json").select();$("jsonMsg").textContent="選択しました。コピーしてください"})}catch(err){$("json").select()}};
-$("importBtn").onclick=()=>{try{const d=JSON.parse($("json").value);
+$("importBtn").onclick=()=>{try{const d=cleanData(stripDeep(JSON.parse($("json").value)));
   if(!d.teams||!d.teams.home||!d.teams.away||!Array.isArray(d.events))throw 0;
   start(d);rememberLast(d);save();renderEditor();render();$("jsonMsg").textContent="読み込みました(時間はキックオフに戻りました)";
   }catch(err){$("jsonMsg").textContent="読み込めませんでした。書き出したときの形式のJSONを貼り付けてください"}};
@@ -1919,6 +1951,11 @@ function mergePinfo(all){let n=0;const idx=ls.get("tacboard.pinfoIdx",{});
 /* display / search settings travel with the file (the API key never does); stored as the raw localStorage strings */
 const SET_KEYS=["tacboard.leagues","tacboard.allLeagues","tacboard.japan","tacboard.ja","tacboard.marks","tacboard.faces","tacboard.loadMode"];
 function getSettings(){const o={};SET_KEYS.forEach(k=>{try{const v=localStorage.getItem(k);if(v!=null)o[k.slice(9)]=v}catch(e){}});return o}
+/* settings are raw localStorage strings: only JSON true/false, a short lowercase word, or a list of ids pass */
+function cleanSettings(o){const r={};if(!o||typeof o!=="object")return r;
+  SET_KEYS.forEach(k=>{const v=o[k.slice(9)];if(typeof v!=="string")return;let x;try{x=JSON.parse(v)}catch(e){return}
+    if(typeof x==="boolean"||(typeof x==="string"&&/^[a-z]{1,10}$/.test(x))||(Array.isArray(x)&&x.length<=200&&x.every(i=>safeId(i)!=null)))r[k.slice(9)]=v});
+  return r}
 function applySettings(o){if(!o||typeof o!=="object")return 0;let n=0;
   SET_KEYS.forEach(k=>{const v=o[k.slice(9)];if(typeof v!=="string")return;try{if(localStorage.getItem(k)!==v){localStorage.setItem(k,v);n++}}catch(e){}});
   if(n){JA=ls.get("tacboard.ja",true);$("nmJa").checked=JA;$("showFaces").checked=facesOn();$("showMarks").checked=marksOn();
@@ -1943,11 +1980,12 @@ $("fxExport").onclick=async()=>{
 $("fxImport").onclick=()=>$("fxFile").click();
 $("fxFile").onchange=async e=>{
   const file=e.target.files&&e.target.files[0];e.target.value="";if(!file)return;
-  let j;try{j=JSON.parse(await file.text())}catch(err){fmsg("fxMsg","ファイルを読み取れませんでした",true);return}
+  let j;try{const raw=JSON.parse(await file.text());j=stripDeep(raw);if(j&&raw)j.settings=cleanSettings(raw.settings)}catch(err){fmsg("fxMsg","ファイルを読み取れませんでした",true);return}
   if(!j||j.app!=="tactics-board"||!Array.isArray(j.items)){fmsg("fxMsg","このアプリで書き出したファイルではありません",true);return}
   let added=0,copies=0,same=0,filled=0;
   j.items.slice().reverse().forEach(it=>{
     if(!it||!it.data||!it.data.teams||!it.data.teams.home||!Array.isArray(it.data.events)||!it.data.fixture)return;
+    cleanData(it.data);if(!it.data.fixture)return;["home","away"].forEach(s=>{if(it[s]){setId(it[s],"id");if(!it[s].id)delete it[s]}});setId(it,"lgId");
     const base=String(it.data.fixture),incoming=strip(it);
     const rec=ls.get("tacboard.recent",[]);
     const mine=rec.filter(r=>String(r.id).split("~")[0]===base).map(r=>{const data=ls.get("tacboard.match."+r.id,null);return data?{r,data,shape:ls.get(matchKey(data),null)}:null}).filter(Boolean);
@@ -1963,15 +2001,15 @@ $("fxFile").onchange=async e=>{
     putRecent({id,date:it.date||"",label:it.label||`${data.teams.home.name} vs ${data.teams.away.name}`,lg:it.lg||"",lgId:it.lgId||data.info&&data.info.lgId||null,at,copy,home:tm("home"),away:tm("away"),seen:it.seen?true:undefined});
     copy?copies++:added++;
   });
-  if(j.pinfoMax&&!piMax())ls.set("tacboard.pinfoMax",j.pinfoMax);
-  const pn=mergePinfo(j.pinfo);
+  if(safeId(j.pinfoMax)&&!piMax())ls.set("tacboard.pinfoMax",safeId(j.pinfoMax));
+  const pn=mergePinfo(cleanPinfo(j.pinfo));
   /* search lists: only dates still in range, the newer list wins; registered teams: added to this device's */
   let fd=0,ft=0;const sn=applySettings(j.settings);
   if(j.fxDays&&typeof j.fxDays==="object"){const [lo,hi]=fxRange(),o=fxDays();
     Object.entries(j.fxDays).forEach(([d,v])=>{if(d<lo||d>hi||!v||!Array.isArray(v.list))return;if(o.days[d]&&(o.days[d].at||0)>=(v.at||0))return;
-      o.days[d]={at:v.at||j.exportedAt||Date.now(),list:v.list.map(slimKeep)};fd++});
+      o.days[d]={at:safeNum(v.at)||j.exportedAt||Date.now(),list:v.list.map(cleanFxItem).filter(Boolean).map(slimKeep)};fd++});
     if(fd){ls.set("tacboard.fxDays",o);gotoDay(false);renderTeamFx()}}
-  if(Array.isArray(j.teams)){const t=myTeams();j.teams.forEach(x=>{if(x&&x.id&&!t.some(y=>y.id===x.id)){t.push({id:x.id,name:x.name||""});ft++}});
+  if(Array.isArray(j.teams)){const t=myTeams();j.teams.forEach(x=>{const id=x&&safeId(x.id);if(id&&!t.some(y=>y.id===id)){t.push({id,name:typeof x.name==="string"?x.name:""});ft++}});
     if(ft){ls.set("tacboard.teams",t);renderTeams();if(lastFx)renderFixtures(lastFx);promptCheck()}}
   /* the open match may be one of the updated ones: reload its extras into the session */
   const oid=entryId(S.data),od=oid&&ls.get("tacboard.match."+oid,null);if(od&&fillExtras(S.data,od)){save();render()}

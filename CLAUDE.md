@@ -192,3 +192,7 @@
   ```
 - 変更後は main に push する(Pages への反映は1〜2分)
 - ユーザーへの説明は日本語で、手順は iPad の Safari 前提で書く
+- **安全(HTMLインジェクション/XSS の防止、2026-11-14 にユーザーの依頼で追加)**: 修正・機能追加のたびに次を守り、危険が残る書き方をしない
+  - innerHTML に入れる文字列は必ず `esc()` を通す(API・names.json・貼り付けた JSON・読み込んだファイル・localStorage 由来はすべて信用しない)。style・fill などに入れる色は `safeColor()`、属性や URL に入れる ID は `safeId()`(数値)、数値は `safeNum()` を通す
+  - 試合データは開くとき `fresh()` の `cleanData()` で色・ID を整える。JSON の貼り付け・ファイル読み込みは `stripDeep()`(全文字列から `< > " \`` を除く)のあと、試合データ `cleanData`、検索結果 `cleanFxItem`、選手情報 `cleanPinfo`、設定 `cleanSettings` を通す。読み込む項目を増やしたら同じように整える
+  - `eval`・`new Function`・文字列の `setTimeout`・`on〜=` 属性・`javascript:` の URL は使わない。APIキーは書き出しに含めない
