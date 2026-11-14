@@ -194,6 +194,12 @@ button.link{border:0;background:none;color:var(--accent);font:inherit;text-decor
 .panel h2{font-family:var(--f-display);font-weight:600;font-size:15px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
 .plist{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px;font-size:14px}
 .plist li{display:grid;grid-template-columns:2.2em 1fr auto;gap:6px;align-items:baseline}
+/* squad lists: the name keeps at least 8em (many tags no longer squeeze it to two letters per line; tags wrap instead).
+   One-column layout (phones): tags go on their own line under the name */
+#benchH li,#benchA li{grid-template-columns:2.2em minmax(8em,1fr) auto}
+@media (max-width:700px){#benchH li,#benchA li{grid-template-columns:2.2em 1fr;row-gap:0}
+  #benchH li>span:last-child,#benchA li>span:last-child{grid-column:2}
+  #benchH li>span:last-child:empty,#benchA li>span:last-child:empty{display:none}}
 .num{font-family:var(--f-display);font-weight:600;font-variant-numeric:tabular-nums;color:var(--muted);text-align:right}
 .pos{display:inline-block;min-width:2.2em;margin-right:6px;font-size:11px;font-weight:700;text-align:center;border-radius:4px;padding:0 3px;color:#fff;vertical-align:1px}
 .posG{background:#c58a12}.posD{background:#2f6db3}.posM{background:#2e8a55}.posF{background:#b8433a}
@@ -496,7 +502,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261115014412">20261115014412</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261115015658">20261115015658</span></p>
 </div>
 
 <script>
