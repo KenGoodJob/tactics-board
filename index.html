@@ -494,7 +494,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261115010652">20261115010652</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261115012238">20261115012238</span></p>
 </div>
 
 <script>
@@ -639,7 +639,7 @@ function stripDeep(o,depth=0){if(depth>40)return null;
   if(Array.isArray(o))return o.map(x=>stripDeep(x,depth+1));
   if(o&&typeof o==="object"){const r={};Object.keys(o).forEach(k=>{if(k==="__proto__"||k==="constructor"||k==="prototype")return;r[stripDeep(k,depth+1)]=stripDeep(o[k],depth+1)});return r}
   return typeof o==="number"||typeof o==="boolean"||o==null?o:null}
-const setId=(o,k)=>{if(o&&o[k]!=null){const v=safeId(o[k]);if(v==null)delete o[k];else o[k]=v}};
+function setId(o,k){if(o&&o[k]!=null){const v=safeId(o[k]);if(v==null)delete o[k];else o[k]=v}}   /* a function (hoisted): cleanData runs on the restored session before this line */
 function cleanData(d){if(!d||typeof d!=="object")return d;setId(d,"fixture");
   if(d.info&&typeof d.info==="object")setId(d.info,"lgId");else delete d.info;
   ["home","away"].forEach(s=>{const T=d.teams&&d.teams[s];if(!T||typeof T!=="object")return;setId(T,"apiId");
@@ -737,9 +737,13 @@ function buildChips(){$("segChips").innerHTML=SEGS.map(s=>`<button class="segbtn
 /* ---------- state at time ---------- */
 function players(t){return S.data.teams[t].players}
 function pmap(){const m={};["home","away"].forEach(t=>players(t).forEach(p=>m[p.id]=p));return m}
-/* coach / bench staff named in a card event: "アンチェロッティ(監督)", others "name(ベンチ)" */
-function staffName(e){if(e.staff==="coach"){const c=S.data.teams[e.team]&&S.data.teams[e.team].coach;
-    return ((c&&JA&&coachJa(c))||unent(c&&c.name||e.sname||""))+"(監督)"}
+/* coach / bench staff named in a card event: "アンチェロッティ(監督)", others "name(ベンチ)".
+   The coach is matched by id, full name or surname ("C. Ancelotti" = "Carlo Ancelotti"); rechecked here so data saved
+   before the coach was known still shows 監督 once it is */
+const lastW=n=>{const w=String(n||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);return w[w.length-1]||""};
+function isCoach(c,id,nm){return !!c&&((id!=null&&c.id!=null&&c.id===id)||(!!nm&&!!c.name&&(fold(nm)===fold(c.name)||(!!lastW(nm)&&lastW(nm)===lastW(c.name)))))}
+function staffName(e){const c=S.data.teams[e.team]&&S.data.teams[e.team].coach;
+  if(e.staff==="coach"||isCoach(c,null,e.sname))return ((c&&JA&&coachJa(c))||unent(c&&c.name||e.sname||""))+"(監督)";
   return (unent(e.sname||"")||"不明")+"(ベンチ)"}
 const CARD_Y=`<i class="cd y"></i>`,CARD_R=`<i class="cd r"></i>`;
 function compute(t){const idx=ord(t);
@@ -1521,7 +1525,7 @@ function convert(fx,lineups,events){
     const grid=p=>{const g=String(p.grid||"").split(":").map(Number);return g.length===2&&g.every(n=>n>0)?g:[99,99]};
     const xi=(L.startXI||[]).map(x=>x.player).sort((a,b)=>{const ga=grid(a),gb=grid(b);return ga[0]-gb[0]||gb[1]-ga[1]});
     const subs=(L.substitutes||[]).map(x=>x.player);
-    const co=L.coach&&L.coach.id!=null?{id:L.coach.id,name:L.coach.name||""}:null;
+    const co=L.coach&&(L.coach.id!=null||L.coach.name)?{...(L.coach.id!=null?{id:L.coach.id}:{}),name:String(L.coach.name||"").slice(0,60)}:null;
     const mk=(p,starter)=>({id:s+"-"+(p.id!=null?p.id:"n"+p.number),apiId:p.id,num:p.number!=null?String(p.number):"",name:p.name||"?",...(/^[GDMF]$/.test(p.pos||"")?{pos:p.pos}:{}),starter});
     const col=L.team&&L.team.colors&&L.team.colors.player,gc=L.team&&L.team.colors&&L.team.colors.goalkeeper;
     /* kit colours from lineups: shirt number colour, goalkeeper shirt and number */
@@ -1536,10 +1540,8 @@ function convert(fx,lineups,events){
   const find=(s,p)=>{if(!p)return null;const ps=teams[s].players;
     return (ps.find(x=>p.id!=null&&x.apiId===p.id)||ps.find(x=>x.name===p.name)||{}).id||null};
   /* a card for someone not in the squad list (head coach or other bench staff): keep who it was, without touching the players */
-  const lastW=n=>{const w=String(n||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);return w[w.length-1]||""};
-  const staffOf=(T,p)=>{if(!p||(p.id==null&&!p.name))return {};const c=T&&T.coach,nm=String(p.name||"").slice(0,60);
-    const isC=c&&((p.id!=null&&c.id===p.id)||(nm&&(fold(nm)===fold(c.name)||lastW(nm)&&lastW(nm)===lastW(c.name))));
-    return {staff:isC?"coach":"bench",...(nm?{sname:nm}:{})}};
+  const staffOf=(T,p)=>{if(!p||(p.id==null&&!p.name))return {};const nm=String(p.name||"").slice(0,60);
+    return {staff:isCoach(T&&T.coach,p.id,nm)?"coach":"bench",...(nm?{sname:nm}:{})}};
   const byId=(s,p)=>p&&p.id!=null&&teams[s].players.some(x=>x.apiId===p.id);
   const whose=p=>["home","away"].find(s=>byId(s,p))||["home","away"].find(s=>find(s,p));
   const on={home:new Set(teams.home.players.filter(p=>p.starter).map(p=>p.id)),away:new Set(teams.away.players.filter(p=>p.starter).map(p=>p.id))};
@@ -1724,7 +1726,7 @@ function renderMinfo(){const d=S.data,T=d.teams,i=d.info||{},ko=kickoffOf(d);
   let h=`<div class="pchd"><div><h3>試合情報</h3><div class="pct">${logo(T.home.apiId)}${esc(tName(T.home.apiId,T.home.name))} – ${esc(tName(T.away.apiId,T.away.name))}${logo(T.away.apiId)}</div></div><button class="pcx" id="mcClose" aria-label="閉じる">×</button></div>`;
   if(!d.fixture){$("mcBox").innerHTML=h+`<p class="empty">テスト用・手入力の試合には試合情報がありません。</p>`;return}
   const lg=lgName(i.lgId,i.league);
-  const coach=t=>{const c=T[t].coach;if(!c)return "–";const u=coachUrl(c.id);return `<span class="mcrow">${FACE_BAD.has(u)?"":`<img class="face" src="${esc(u)}" alt="">`}${esc(JA&&coachJa(c)||unent(c.name))}</span>`};
+  const coach=t=>{const c=T[t].coach;if(!c)return "–";const u=c.id!=null?coachUrl(c.id):"";return `<span class="mcrow">${!u||FACE_BAD.has(u)?"":`<img class="face" src="${esc(u)}" alt="">`}${esc(JA&&coachJa(c)||unent(c.name))}</span>`};
   const ref=i.referee?i.referee.split(",").map(x=>x.trim()):null;
   const wx=i.wx;
   h+=`<dl class="pcprof">
