@@ -294,6 +294,8 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
 .tblwrap{overflow-x:auto}
 .del{border:1px solid var(--line);background:transparent;border-radius:6px;padding:2px 10px;font-size:12px;color:var(--danger)}
 .del.armed{background:var(--danger);color:#fff;border-color:var(--danger)}
+.pcards{margin-left:4px;white-space:nowrap}
+.ghost.armed{background:#e0a800;color:#000;border-color:#e0a800}
 .jsonbox{display:flex;flex-direction:column;gap:8px}
 .jsonbox textarea{min-height:120px}
 .btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -494,7 +496,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261115012238">20261115012238</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261115012649">20261115012649</span></p>
 </div>
 
 <script>
@@ -913,8 +915,13 @@ function playerStatsHtml(ps){if(!ps)return "";const T=S.data.teams,list=(ps[PS_T
   const nm=r=>{const p=pm[r.pid];return p?(p.num!==""?p.num+" ":"")+pName(p):r.name};
   return `<div class="pstab">${["home","away"].map(t=>`<button class="ghost${PS_TEAM===t?" on":""}" data-psteam="${t}">${logo(T[t].apiId)}${esc(tName(T[t].apiId,T[t].name))}</button>`).join("")}</div>
     <div class="pswrap"><table class="pst"><thead><tr><th>選手</th>${PS_COLS.map(([k,l])=>`<th><button data-pssort="${k}" class="${PS_SORT===k?"on":""}">${l}</button></th>`).join("")}</tr></thead>
-    <tbody>${list.map(r=>`<tr><td${r.pid&&pm[r.pid]?` class="pn" data-pinfo="${esc(r.pid)}"`:""}><span class="pnm">${pm[r.pid]?faceImg(pm[r.pid]):""}${esc(nm(r))}${r.cap?`<span class="cap" title="キャプテン">C</span>`:""}</span></td>${PS_COLS.map(([k])=>`<td>${r[k]==null||r[k]===""?"–":esc(r[k])}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${PS_COLS.length+1}">データがありません</td></tr>`}</tbody></table></div>`}
+    <tbody>${list.map(r=>`<tr><td${r.pid&&pm[r.pid]?` class="pn" data-pinfo="${esc(r.pid)}"`:""}><span class="pnm">${pm[r.pid]?faceImg(pm[r.pid]):""}${esc(nm(r))}${r.cap?`<span class="cap" title="キャプテン">C</span>`:""}${r.pid?pstCards(r.pid):""}</span></td>${PS_COLS.map(([k])=>`<td>${r[k]==null||r[k]===""?"–":esc(r[k])}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${PS_COLS.length+1}">データがありません</td></tr>`}</tbody></table></div>`}
 /* width of the fixed name column = the longest name of the team shown (face, number, name and C included) */
+/* cards after the name in the player stats table (only shown on the 試合終了 row, so every event is already applied):
+   from the events, the same way as the board: 2nd yellow = yellow+yellow, straight red = red (after a yellow: yellow+red) */
+function pstCards(pid){let y=0,r=0;S.data.events.forEach(e=>{if(e.player!==pid||e.staff)return;
+    if(e.type==="yellow")y++;else if(e.type==="red")r=e.second||y>0?2:1});
+  const h=r===2?CARD_Y+CARD_Y:r===1?(y?CARD_Y:"")+CARD_R:y?CARD_Y:"";return h?`<span class="pcards">${h}</span>`:""}
 function fitPst(){document.querySelectorAll(".pst").forEach(t=>{const cells=[...t.querySelectorAll("tr>:first-child")];
   cells.forEach(c=>{c.style.minWidth=c.style.width=""});
   const w=Math.max(0,...[...t.querySelectorAll(".pnm")].map(x=>Math.ceil(x.getBoundingClientRect().width)));if(!w)return;
@@ -1919,11 +1926,13 @@ function renderRecent(){
   const shown=rec.map((r,i)=>({r,i,k:koMs(r)})).sort((a,b)=>(!!a.r.seen-!!b.r.seen)||(a.k-b.k)||(a.i-b.i)).map(x=>x.r);
   $("fRecent").innerHTML=shown.map(r=>{const kt=koT(r);return `<li><span class="ko" style="font-size:13px">${esc(r.date.slice(5).replace("-","/"))}${kt?`<span class="kot">${esc(kt)}</span>`:""}</span>
     <span class="vs"><span class="lg">${lgLogo(recentLg(r))}${esc(r.lg)}${r.at?` ・ ${esc(fmtAt(r.at))} 時点`:""}${r.copy?' ・ <b class="copy">別の内容</b>':""}</span>${r.home&&r.away?`${star(r.home)}${logo(r.home.id)}${esc(tName(r.home.id,r.home.name))} vs ${star(r.away)}${logo(r.away.id)}${esc(tName(r.away.id,r.away.name))}`:esc(r.label)}</span>
-    <span style="display:flex;gap:6px;align-items:center"><label class="seen"><input type="checkbox" data-seen="${esc(r.id)}"${r.seen?" checked":""}>観戦済み</label><button class="ghost" data-open="${esc(r.id)}">開く</button><button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`}).join("");
+    <span style="display:flex;gap:6px;align-items:center"><label class="seen"><input type="checkbox" data-seen="${esc(r.id)}"${r.seen?" checked":""}>観戦済み</label><button class="ghost" data-open="${esc(r.id)}">開く</button>${r.copy?"":`<button class="ghost" data-refetch="${esc(r.id)}">取り直す</button>`}<button class="del" data-forget="${esc(r.id)}" aria-label="一覧から消す">消す</button></span></li>`}).join("");
 }
 $("fRecent").addEventListener("change",e=>{const c=e.target.closest("[data-seen]");if(c)setSeen(c.dataset.seen,c.checked)});
 $("fRecent").addEventListener("click",e=>{
   const st=e.target.closest("[data-star]");if(st){toggleTeam(+st.dataset.star,st.dataset.name);return}
+  const rf=e.target.closest("[data-refetch]");
+  if(rf){if(armTap(rf,`もう一度タップで取り直す(API ${apiN()}回)`))return;refetchSaved(+rf.dataset.refetch,"fMsg");return}
   const o=e.target.closest("[data-open]"),d=e.target.closest("[data-forget]");
   if(o){const c=ls.get("tacboard.match."+o.dataset.open,null);if(c){loadMatch(c);fmsg("fMsg","保存済みのデータを開きました(通信なし)");closeFinder()}}
   /* forgetting needs a second tap on the same button within 3 seconds */
@@ -2046,7 +2055,7 @@ const liveable=()=>{const d=S&&S.data;return !!(d&&d.fixture&&!d.copy&&!ls.get("
 function renderLive(){const b=$("liveBox");if(b)b.hidden=!liveable()}
 function fxOf(fid){return (lastFx||[]).find(x=>x.fixture.id===fid)||Object.values(fxDays().days).flatMap(v=>v.list).find(x=>x.fixture.id===fid)||null}
 let LIVE_BUSY=false;
-async function refreshLive(mid="liveMsg"){
+async function refreshLive(mid="liveMsg",force=false){   /* force: a saved (finished) match fetched again on request; the saved copy is overwritten */
   const d=S.data,fid=d&&d.fixture;if(!fid||LIVE_BUSY)return;
   const i=d.info||{},T=d.teams;
   const f=fxOf(fid)||{fixture:{id:fid,date:new Date((d.kickoff||Date.now())+9*3600e3).toISOString().slice(0,19)+"+09:00",timestamp:d.kickoff?d.kickoff/1000:null,venue:{id:i.venueId,name:i.venue,city:i.city},referee:i.referee},
@@ -2061,14 +2070,22 @@ async function refreshLive(mid="liveMsg"){
     if(i.wx&&nd.info&&!nd.info.wx)nd.info.wx=i.wx;
     ["home","away"].forEach(t=>{if(!nd.teams[t].coach&&T[t].coach)nd.teams[t].coach=T[t].coach});
     S.data=nd;
-    if(isDone(f)){storeMatch(f,nd);rememberLast(nd);renderRecent()}
+    if(isDone(f)||force){storeMatch(f,nd);rememberLast(nd);renderRecent()}
     save();renderEditor();render();renderTeamFx();
     /* nothing about what changed is said: new events stay hidden until the time is applied */
-    fmsg(mid,`最新のデータに差し替えました(${fmtAt(Date.now())} 時点)。新しい出来事は、時間表示をタップして反映したときに出ます ${quotaText()}`);
+    fmsg(mid,`${force?"取り直して保存し直しました":"最新のデータに差し替えました"}(${fmtAt(Date.now())} 時点)。新しい出来事は、時間表示をタップして反映したときに出ます ${quotaText()}`);
   }catch(e){fmsg(mid,e.message,true)}
   finally{LIVE_BUSY=false;$("liveGo").disabled=false}
 }
 $("liveGo").onclick=()=>refreshLive();
+/* fetching a saved match again costs API requests, so it needs a second tap within 3 seconds (like 消す) */
+const apiN=()=>loadMode()==="split"?3:2;
+function armTap(b,label){if(b.classList.contains("armed"))return false;const orig=b.textContent;b.classList.add("armed");b.textContent=label;
+  clearTimeout(b._t);b._t=setTimeout(()=>{b.classList.remove("armed");b.textContent=orig},3000);return true}
+/* open the saved copy (unless it is the one open) and fetch it again: time, applied moment, saved board, 観戦済み and hand-set colours stay */
+function refetchSaved(fid,mid){const c=ls.get("tacboard.match."+fid,null);
+  if(!(S.data&&S.data.fixture===fid&&!S.data.copy)){if(!c)return;loadMatch(c)}
+  refreshLive(mid,true)}
 
 /* ---------- each team's country and league, learnt from what is already kept (no API) ----------
    a "Regular Season" match tells the league both clubs play in; learnt from every saved day list and saved / open match,
@@ -2101,8 +2118,8 @@ function renderTeamFx(){const ids=new Set(myTeams().map(x=>x.id)),box=$("tmFxBox
 /* loaded = saved on this device (finished) or the match now open */
 const loadedFx=fid=>!!(ls.get("tacboard.match."+fid,null)||S&&S.data&&S.data.fixture===fid&&!S.data.copy);
 $("tmFx").addEventListener("click",e=>{const b=e.target.closest("[data-tmfx]");if(!b)return;const fid=+b.dataset.tmfx;
-  if(S.data&&S.data.fixture===fid&&!S.data.copy){   /* the match now open: keep time, applied moment and board */
-    if(liveable())refreshLive("tmMsg");else fmsg("tmMsg","この試合は終了後のデータを開いています(取り直す必要はありません)");return}
+  if(S.data&&S.data.fixture===fid&&!S.data.copy&&liveable()){refreshLive("tmMsg");return}   /* open, not finished yet: keep time, applied moment and board */
+  if(loadedFx(fid)){if(armTap(b,`もう一度タップで取り直す(API ${apiN()}回)`))return;refetchSaved(fid,"tmMsg");return}   /* saved: fetch again after a second tap */
   loadFixture(fid,"tmMsg")});
 $("tmList").addEventListener("click",e=>{const b=e.target.closest("[data-unstar]");if(b){const t=myTeams().find(x=>x.id===+b.dataset.unstar);if(t)toggleTeam(t.id,t.name)}});
 function promptCheck(){const last=ls.get("tacboard.teamCheck",0);
