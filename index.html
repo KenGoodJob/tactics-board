@@ -496,7 +496,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261115012649">20261115012649</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261115013857">20261115013857</span></p>
 </div>
 
 <script>
@@ -1392,7 +1392,7 @@ function missingNames(){
   datas.forEach(([d])=>{const i=d.info;if(i){if(i.lgId!=null&&!LG_NAME[i.lgId])addL(i.lgId,i.league);
       if(i.venue&&!venueJa(i.venueId,i.venue)){const k=i.venueId??i.venue;if(!venues.has(k))venues.set(k,{id:i.venueId??"",name:i.venue,city:i.city||""})}
       if(i.referee){const [n,c]=i.referee.split(",").map(x=>x.trim());if(n&&!refJa(n)&&!refs.has(n))refs.set(n,{name:n,country:c||""})}}
-    ["home","away"].forEach(sd=>{const T=d.teams&&d.teams[sd],c=T&&T.coach;if(c&&c.id!=null&&!coachJa(c)&&!coaches.has(c.id))coaches.set(c.id,{id:c.id,name:c.name,team:T.name,teamId:T.apiId})})});
+    ["home","away"].forEach(sd=>{const T=d.teams&&d.teams[sd],c=T&&T.coach;if(c&&c.id!=null&&c.name&&!coachJa(c)&&!coaches.has(c.id))coaches.set(c.id,{id:c.id,name:c.name,team:T.name,teamId:T.apiId})})});
   /* competitions and other clubs that appear in the saved player stats */
   Object.keys(ls.get("tacboard.pinfoIdx",{})).forEach(tid=>piSnaps(tid).forEach(sn=>Object.values(sn.p||{}).forEach(x=>(x.st||[]).forEach(r=>{
     if(!LG_NAME[r[0]])addL(r[0],r[1]);if(r[2]!=null&&r[11])addT(r[2],r[11],"選手成績")}))));
@@ -1733,7 +1733,7 @@ function renderMinfo(){const d=S.data,T=d.teams,i=d.info||{},ko=kickoffOf(d);
   let h=`<div class="pchd"><div><h3>試合情報</h3><div class="pct">${logo(T.home.apiId)}${esc(tName(T.home.apiId,T.home.name))} – ${esc(tName(T.away.apiId,T.away.name))}${logo(T.away.apiId)}</div></div><button class="pcx" id="mcClose" aria-label="閉じる">×</button></div>`;
   if(!d.fixture){$("mcBox").innerHTML=h+`<p class="empty">テスト用・手入力の試合には試合情報がありません。</p>`;return}
   const lg=lgName(i.lgId,i.league);
-  const coach=t=>{const c=T[t].coach;if(!c)return "–";const u=c.id!=null?coachUrl(c.id):"";return `<span class="mcrow">${!u||FACE_BAD.has(u)?"":`<img class="face" src="${esc(u)}" alt="">`}${esc(JA&&coachJa(c)||unent(c.name))}</span>`};
+  const coach=t=>{const c=T[t].coach;if(!c)return "–";const u=c.id!=null?coachUrl(c.id):"";return `<span class="mcrow">${!u||FACE_BAD.has(u)?"":`<img class="face" src="${esc(u)}" alt="">`}${esc(JA&&coachJa(c)||unent(c.name)||"–")}</span>`};
   const ref=i.referee?i.referee.split(",").map(x=>x.trim()):null;
   const wx=i.wx;
   h+=`<dl class="pcprof">
