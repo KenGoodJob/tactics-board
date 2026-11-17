@@ -502,7 +502,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261118023044">20261118023044</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261118032219">20261118032219</span></p>
 </div>
 
 <script>
@@ -755,7 +755,7 @@ function staffName(e){const c=S.data.teams[e.team]&&S.data.teams[e.team].coach;
   return (unent(e.sname||"")||"不明")+"(ベンチ)"}
 const CARD_Y=`<i class="cd y"></i>`,CARD_R=`<i class="cd r"></i>`;
 function compute(t){const idx=ord(t);
-  const st={slots:{},score:{home:0,away:0},pk:{home:0,away:0},pkUsed:false,log:[],tags:{},marks:{},reds:{home:[],away:[]},y2:new Set()};
+  const st={slots:{},score:{home:0,away:0},pk:{home:0,away:0},pkUsed:false,log:[],tags:{},marks:{},reds:{home:[],away:[]},y2:new Set(),subIn:new Set()};
   ["home","away"].forEach(t=>{st.slots[t]=players(t).filter(p=>p.starter).slice(0,11).map(p=>p.id);while(st.slots[t].length<11)st.slots[t].push(null)});
   const evs=S.data.events.map((e,o)=>({e,o,i:evOrd(e)})).filter(x=>x.i<=idx).sort((a,b)=>a.i-b.i||a.o-b.o);
   const tag=(id,cls,txt,pre)=>{if(id)(st.tags[id]=st.tags[id]||[]).push({cls,txt,pre})};
@@ -763,7 +763,7 @@ function compute(t){const idx=ord(t);
   evs.forEach(({e})=>{
     if(e.staff){if(e.type==="red"&&e.second)st.y2.add(e.id);st.log.push(e);return}   /* coach / bench staff: no effect on players or the red-card count */
     const sl=st.slots[e.team]||[];const lab=evLabel(e);
-    if(e.type==="sub"){const k=sl.indexOf(e.player);if(k>=0&&e.playerIn)sl[k]=e.playerIn;tag(e.player,"out","OUT "+lab);tag(e.playerIn,"in","IN "+lab)}
+    if(e.type==="sub"){const k=sl.indexOf(e.player);if(k>=0&&e.playerIn)sl[k]=e.playerIn;tag(e.player,"out","OUT "+lab);tag(e.playerIn,"in","IN "+lab);if(e.playerIn)st.subIn.add(e.playerIn)}
     else if(e.type==="red"){const k=sl.indexOf(e.player);if(k>=0)sl[k]=null;
       /* a red after a yellow in the same match (or flagged by the API) is shown as a second yellow */
       const m=mk(e.player),two=!!e.second||m.y>0;m.r=two?2:1;if(two)st.y2.add(e.id);
@@ -822,7 +822,7 @@ function render(){
   $("pkScore").hidden=!st.pkUsed;$("pkScore").textContent="PK "+st.pk.home+" – "+st.pk.away;
   const ap=norm(S.applied);$("appliedClock").textContent=(ap.seg==="1H"&&ap.min===0)?"キックオフ":ap.seg==="FT"?tLabel(ap):ap.seg==="PK"?"PK戦"+(ap.add?" "+tLabel(ap):""):tSeg(ap)+" "+tLabel(ap);
   // board: pitch players, then the bench strip under the pitch (subs nearest the halfway line, players who left after them, faded)
-  let g="";const showM=marksOn(),showF=facesOn(),opt={showM,showF,marks:st.marks,rt:ratingMap(),nat:natMap()};
+  let g="";const showM=marksOn(),showF=facesOn(),opt={showM,showF,marks:st.marks,subIn:st.subIn,rt:ratingMap(),nat:natMap()};
   ["home","away"].forEach(t=>{
     st.slots[t].forEach((pid,s)=>{
       if(!pid)return;const p=pm[pid];if(!p)return;
@@ -1006,9 +1006,11 @@ function flagSvg(f){return f?`<text class="flg" x="-2.55" y="2.75" text-anchor="
 function ratingSvg(v){if(!v)return "";const c=v>=8?"#1f8a52":v>=7?"#3d7fbf":v>=6?"#7a7f86":"#c0503a";
   return `<g pointer-events="none"><rect x="-4.6" y="-4.3" width="3.6" height="2.2" rx=".5" fill="${c}" stroke="rgba(0,0,0,.4)" stroke-width=".15"/>
     <text x="-2.8" y="-2.65" text-anchor="middle" font-size="1.55" font-weight="700" font-family="Barlow Condensed,Arial Narrow,sans-serif" fill="#fff">${v.toFixed(1)}</text></g>`}
-function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier,rt,nat}){
+function tokenSvg(p,t,o,{gk,showF,showM,marks,subIn,attr,bench,gone,tier,rt,nat}){
   const T=S.data.teams[t],col=T.color,fu=showF&&faceUrl(p),face=!!fu&&!FACE_BAD.has(fu),bg=gk?(T.gkColor||"#e9e4d6"):col,sh=pShort(p),m=marks[p.id];
   const fg=numOn(bg,gk?T.gkNum:T.numColor);
+  /* came on as a substitute (applied range only, so no spoiler): 🔁 before the number / name, always shown (2026-11-18) */
+  const si=subIn&&subIn.has(p.id)?"\u{1F501}":"",plain=si+sh;
   const sc=bench?BENCH_SC:1,ly=bench?(tier?7.1:4.7):4.9;
   return `<g class="pl${gone?" gone":""}" data-team="${t}" data-pid="${esc(p.id)}" ${attr} data-sc="${sc}" transform="translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})${sc!==1?` scale(${sc})`:""}" style="cursor:grab"${gone?` opacity=".45"`:""}>
     <circle r="3.4" fill="transparent"/>
@@ -1019,7 +1021,7 @@ function tokenSvg(p,t,o,{gk,showF,showM,marks,attr,bench,gone,tier,rt,nat}){
     ${markSvg(m,showM)}
     ${rt?ratingSvg(rt[p.id]):""}
     ${nat&&p.apiId!=null?flagSvg(natFlag(nat[p.apiId])):""}
-    <text class="pname" data-plain="${esc(sh)}" y="${ly}" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(face&&p.num!==""?p.num+" "+sh:sh)}</text>
+    <text class="pname" data-plain="${esc(plain)}" y="${ly}" text-anchor="middle" font-size="1.75" font-family="Zen Kaku Gothic New,sans-serif" fill="#f4f8f0" stroke="rgba(0,0,0,.65)" stroke-width=".45" paint-order="stroke">${esc(face&&p.num!==""?si+p.num+" "+sh:plain)}</text>
   </g>`}
 /* kit number colour when it stands out from the shirt colour, else black / white */
 function numOn(bg,want){return want&&/^#[0-9a-f]{6}$/i.test(want)&&/^#[0-9a-f]{6}$/i.test(bg)&&cdist(want,bg)>=110?want:textOn(bg)}
