@@ -502,7 +502,7 @@ details.editor>summary span{font-weight:400;font-size:13px;color:var(--danger);m
     <button data-jump="finder">試合を探す</button><button data-jump="secFile">書き出し・読み込み</button><button data-jump="editor">試合データを編集</button></div>
     <button class="jbtn" id="jumpBtn" aria-label="ページ内の移動" aria-expanded="false">☰</button></nav>
   <div class="pcard" id="pcard" hidden><div class="pcbox" role="dialog" aria-modal="true" aria-labelledby="pcName" id="pcBox"></div></div>
-  <p class="ver">バージョン <span id="ver" data-ver="20261118033656">20261118033656</span></p>
+  <p class="ver">バージョン <span id="ver" data-ver="20261118034516">20261118034516</span></p>
 </div>
 
 <script>
@@ -993,7 +993,7 @@ async function fetchStats(kind,force){const fx=S.data.fixture;if(!fx)return;cons
 /* board marks: this match's yellow card (beside the disc) and goals/assists (above it), only up to the applied time */
 function faceImg(p){const u=faceUrl(p);return u&&!FACE_BAD.has(u)?`<img class="face" src="${esc(u)}" alt="" loading="lazy">`:""}
 /* one player disc (pitch or bench). Bench discs are smaller, never saved, and reset on 更新 */
-const BENCH_CAP=11,BENCH_STEP=4.6,BENCH_GAP=3,BENCH_TOP=73.5,BENCH_Y0=77.5,BENCH_DY=9,BENCH_SC=.85;
+const BENCH_CAP=11,BENCH_STEP=4.6,BENCH_GAP=3,BENCH_TOP=73.5,BENCH_Y0=77.5,BENCH_DY=13,BENCH_SC=.85;
 let BENCH_POS={};
 /* row count depends only on the squad size (+2 spare), so a sending-off never changes the board height */
 function benchRows(){return Math.max(1,...["home","away"].map(t=>Math.ceil((Math.max(0,players(t).length-11)+2)/BENCH_CAP)))}
